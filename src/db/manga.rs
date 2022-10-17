@@ -76,6 +76,13 @@ pub async fn update_manga(
 
     let stored = get_manga(url, conn, c).await?;
 
+    if let Some(u) = stored.last_watch_time {
+        if (Utc::now().naive_utc() - u).num_minutes() <= 15 {
+            println!("Not Watching because of time limit");
+            return Ok(());
+        }
+    }
+
     let t = stored.name == mng.name
         && stored.cover_url == mng.cover_url
         && stored.last_updated == mng.last_updated
