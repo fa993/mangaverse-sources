@@ -77,7 +77,7 @@ pub async fn update_manga(
     let stored = get_manga(url, conn, c).await?;
 
     if let Some(u) = stored.last_watch_time {
-        if (Utc::now().naive_utc() - u).num_minutes() <= 15 {
+        if Utc::now().timestamp_millis() - u <= 15 * 60 * 1000 {
             println!("Not Watching because of time limit");
             return Ok(());
         }
