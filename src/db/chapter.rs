@@ -1,9 +1,13 @@
 use mangaverse_entity::models::chapter::ChapterTable;
-use sqlx::{QueryBuilder, MySqlPool};
+use sqlx::{MySqlPool, QueryBuilder};
 
 use crate::Result;
 
-pub async fn update_chapter(ori: &ChapterTable, lat: &ChapterTable, pool: &MySqlPool) -> Result<()> {
+pub async fn update_chapter(
+    ori: &ChapterTable,
+    lat: &ChapterTable,
+    pool: &MySqlPool,
+) -> Result<()> {
     let chk_met = ori.chapter_name == lat.chapter_name
         && ori.chapter_number == lat.chapter_number
         && ori.updated_at == lat.updated_at;
@@ -42,19 +46,22 @@ pub async fn update_chapter(ori: &ChapterTable, lat: &ChapterTable, pool: &MySql
     Ok(())
 }
 
-pub async fn delete_extra_chaps(chp_ids: &[&str], pool: &MySqlPool) -> Result<()>{
+pub async fn delete_extra_chaps(chp_ids: &[&str], pool: &MySqlPool) -> Result<()> {
     for t in chp_ids {
-        sqlx::query!("DELETE FROM chapter_page where chapter_id = ?", t).execute(pool).await?;
-        sqlx::query!("DELETE FROM chapter where chapter_id = ?", t).execute(pool).await?;
+        sqlx::query!("DELETE FROM chapter_page where chapter_id = ?", t)
+            .execute(pool)
+            .await?;
+        sqlx::query!("DELETE FROM chapter where chapter_id = ?", t)
+            .execute(pool)
+            .await?;
     }
     Ok(())
 }
 
 pub async fn add_extra_chaps(chps: &[ChapterTable], pool: &MySqlPool) -> Result<()> {
-
     for lat in chps {
         sqlx::query!("INSERT INTO chapter(chapter_name, chapter_number, updated_at, chapter_id, manga_id, sequence_number, last_watch_time) VALUES(?, ?, ?, ?, ?, ?, ?)", lat.chapter_name, lat.chapter_number, lat.updated_at, lat.chapter_id, lat.manga_id, lat.sequence_number, lat.last_watch_time).execute(pool).await?;
-        
+
         let mut q = QueryBuilder::new("INSERT into chapter_page(url, page_number, chapter_id) ");
 
         q.push_values(lat.pages.as_slice(), |mut b, page| {

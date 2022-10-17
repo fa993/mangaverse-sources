@@ -6,7 +6,8 @@ use mangaverse_entity::models::{
 };
 use scraper::{Html, Selector};
 use sqlx::{
-    types::chrono::{NaiveDateTime, Utc}, MySqlPool,
+    types::chrono::{NaiveDateTime, Utc},
+    MySqlPool,
 };
 
 use lazy_static::lazy_static;

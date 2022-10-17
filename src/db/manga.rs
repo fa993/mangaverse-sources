@@ -3,6 +3,8 @@ use std::cmp::Ordering;
 use crate::{Context, Result};
 use futures::future::join_all;
 use futures::try_join;
+use futures::TryFutureExt;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use mangaverse_entity::models::chapter::ChapterTable;
 use mangaverse_entity::models::manga::MangaTable;
@@ -10,12 +12,10 @@ use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::NaiveDateTime;
-use sqlx::{FromRow, Row, MySqlPool};
+use sqlx::{FromRow, MySqlPool, Row};
 use uuid::Uuid;
-use futures::TryFutureExt;
-use itertools::Itertools;
 
-use super::chapter::{update_chapter, add_extra_chaps, delete_extra_chaps};
+use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
 
 lazy_static! {
     static ref JUNK_SOURCE: SourceTable = SourceTable {
@@ -90,11 +90,20 @@ pub async fn update_manga(
 
     //handle collection updates probably by a generic function
 
-    let fut = stored.chapters.iter().zip(mng.chapters.iter()).map(|(s, m)| {
-        update_chapter(s, m, pool)
-    }).collect::<Vec<_>>();
+    let fut = stored
+        .chapters
+        .iter()
+        .zip(mng.chapters.iter())
+        .map(|(s, m)| update_chapter(s, m, pool))
+        .collect::<Vec<_>>();
 
-    join_all(fut).await.iter().filter(|f| f.is_err()).for_each(|f| {println!("{}", f.as_ref().unwrap_err());});
+    join_all(fut)
+        .await
+        .iter()
+        .filter(|f| f.is_err())
+        .for_each(|f| {
+            println!("{}", f.as_ref().unwrap_err());
+        });
 
     match stored.chapters.len().cmp(&mng.chapters.len()) {
         Ordering::Less => {
@@ -104,11 +113,21 @@ pub async fn update_manga(
                 r.manga_id = stored.id.clone();
             }
             add_extra_chaps(&mng.chapters[stored.chapters.len()..], pool).await?;
-        },
+        }
         Ordering::Greater => {
             //delete extra
-            delete_extra_chaps(stored.chapters.iter().skip(mng.chapters.len()).map(|f| f.chapter_id.as_str()).collect::<Vec<_>>().as_slice(), pool).await?;
-        },
+            delete_extra_chaps(
+                stored
+                    .chapters
+                    .iter()
+                    .skip(mng.chapters.len())
+                    .map(|f| f.chapter_id.as_str())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                pool,
+            )
+            .await?;
+        }
         _ => {}
     }
 
