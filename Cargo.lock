@@ -791,7 +791,7 @@ checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 [[package]]
 name = "mangaverse-entity"
 version = "0.4.0"
-source = "git+https://github.com/fa993/mangaverse-entity?rev=eeb068d#eeb068d64b50acb0261dc493001b73d73c7f6ac6"
+source = "git+https://github.com/fa993/mangaverse-entity?rev=9c6c867#9c6c867e40d2bccd394b8f04372d5303c841ce88"
 dependencies = [
  "chrono",
  "serde",
