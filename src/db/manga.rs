@@ -157,7 +157,7 @@ pub async fn get_manga<'a>(
 
     let source = sqlx::query_as!(
         RowWrapperString,
-        "SELECT name as data from source where source_id = ?",
+        "SELECT source_id as data from source where source_id = ?",
         r.source_id
     )
     .fetch_one(pool)
