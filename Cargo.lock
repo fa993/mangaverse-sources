@@ -1036,7 +1036,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mangaverse-service"
+name = "mangaverse-sources"
 version = "0.1.0"
 dependencies = [
  "async-std",
