@@ -78,7 +78,10 @@ pub async fn get_manga<'a>(
         mng.name.extend(
             doc.select(&NAME_SELECTOR)
                 .next()
-                .ok_or(MSError::TextParseError)?
+                .ok_or(MSError {
+                    message: "Failed to get name".to_string(),
+                    err_type: crate::MSErrorType::TextParseError,
+                })?
                 .text(),
         );
 
@@ -92,7 +95,10 @@ pub async fn get_manga<'a>(
             doc.select(&COVERURL_SELECTOR)
                 .next()
                 .and_then(|f| f.value().attr("src"))
-                .ok_or(MSError::TextParseError)?,
+                .ok_or(MSError {
+                    message: "Failed to get cover url link".to_string(),
+                    err_type: crate::MSErrorType::TextParseError,
+                })?,
         );
 
         if let Some(x) = doc.select(&TITLES_SELECTOR).next() {

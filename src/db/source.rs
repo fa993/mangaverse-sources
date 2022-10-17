@@ -19,7 +19,10 @@ pub async fn insert_source_if_not_exists(
     .fetch_optional(pool)
     .await?;
     if exists.is_some() {
-        exists.ok_or(MSError::NoError)
+        exists.ok_or(MSError {
+            message: "exists if check".to_string(),
+            err_type: crate::MSErrorType::NoError,
+        })
     } else {
         let y = SourceTable {
             id: Uuid::new_v4().to_string(),

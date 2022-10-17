@@ -11,8 +11,8 @@ pub mod readm;
 
 pub type Result<T> = std::result::Result<T, MSError>;
 
-#[derive(Debug, Clone, Copy)]
-pub enum MSError {
+#[derive(Debug, Clone)]
+pub enum MSErrorType {
     TextParseError,
 
     SQLError,
@@ -28,21 +28,36 @@ pub enum MSError {
     NoError,
 }
 
+#[derive(Debug, Clone)]
+pub struct MSError {
+    pub message: String,
+    pub err_type: MSErrorType,
+}
+
 impl From<sqlx::Error> for MSError {
-    fn from(_: sqlx::Error) -> Self {
-        Self::SQLError
+    fn from(a: sqlx::Error) -> Self {
+        Self {
+            message: a.to_string(),
+            err_type: MSErrorType::SQLError,
+        }
     }
 }
 
 impl From<reqwest::Error> for MSError {
-    fn from(_: reqwest::Error) -> Self {
-        Self::NetworkError
+    fn from(a: reqwest::Error) -> Self {
+        Self {
+            message: a.to_string(),
+            err_type: MSErrorType::NetworkError,
+        }
     }
 }
 
 impl From<std::io::Error> for MSError {
-    fn from(_: std::io::Error) -> Self {
-        Self::IOError
+    fn from(a: std::io::Error) -> Self {
+        Self {
+            message: a.to_string(),
+            err_type: MSErrorType::IOError,
+        }
     }
 }
 
