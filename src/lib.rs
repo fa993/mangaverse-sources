@@ -22,6 +22,8 @@ pub enum MSError {
 
     IOError,
 
+    JoinHandleError,
+
     OtherError,
 
     NoError,
@@ -44,7 +46,6 @@ impl From<std::io::Error> for MSError {
         Self::IOError
     }
 }
-
 
 #[derive(Default, Debug)]
 pub struct Context {
