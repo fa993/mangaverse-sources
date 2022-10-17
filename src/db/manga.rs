@@ -12,6 +12,8 @@ use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::NaiveDateTime;
 use sqlx::{FromRow, Row, MySqlPool};
 use uuid::Uuid;
+use futures::TryFutureExt;
+use itertools::Itertools;
 
 use super::chapter::{update_chapter, add_extra_chaps, delete_extra_chaps};
 
