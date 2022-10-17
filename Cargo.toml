@@ -16,4 +16,4 @@ itertools = "0.10.5"
 
 [dependencies.sqlx]
 version = "0.5.13"
-features = ["mysql", "chrono", "macros"]
+features = ["mysql", "chrono", "macros", "runtime-tokio-rustls"]
