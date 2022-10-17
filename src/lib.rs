@@ -11,7 +11,7 @@ pub mod readm;
 
 pub type Result<T> = std::result::Result<T, MSError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum MSError {
 
     TextParseError,
