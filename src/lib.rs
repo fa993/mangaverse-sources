@@ -13,7 +13,6 @@ pub type Result<T> = std::result::Result<T, MSError>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum MSError {
-
     TextParseError,
 
     SQLError,

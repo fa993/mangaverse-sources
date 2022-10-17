@@ -72,13 +72,8 @@ pub async fn get_manga<'a>(
     mng.url = url;
 
     {
-        let doc = Html::parse_document(
-            reqwest::get(mng.url.as_str())
-                .await?
-                .text()
-                .await?
-                .as_str(),
-        );
+        let doc =
+            Html::parse_document(reqwest::get(mng.url.as_str()).await?.text().await?.as_str());
 
         mng.name.extend(
             doc.select(&NAME_SELECTOR)
@@ -147,7 +142,7 @@ pub async fn get_manga<'a>(
                 };
                 let mut r = String::from(WEBSITE_HOST);
                 r.push_str(x);
-                
+
                 t.chapter_id = r.to_string();
 
                 mng.chapters.push(t);
@@ -156,7 +151,6 @@ pub async fn get_manga<'a>(
     }
 
     {
-
         for yt in mng.chapters.iter_mut() {
             let r = yt.chapter_id.clone();
             populate_chapter(yt, r.as_str()).await;
@@ -169,10 +163,8 @@ pub async fn get_manga<'a>(
         for t in mng.chapters.iter_mut() {
             t.sequence_number = sz - t.sequence_number - 1;
         }
-
     }
 
-    
     Ok(mng)
 }
 

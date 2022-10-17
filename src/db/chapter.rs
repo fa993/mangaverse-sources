@@ -1,5 +1,5 @@
 use mangaverse_entity::models::chapter::ChapterTable;
-use sqlx::{MySql, QueryBuilder, Executor};
+use sqlx::{Executor, MySql, QueryBuilder};
 
 use crate::Result;
 
@@ -46,7 +46,10 @@ pub async fn update_chapter(
     Ok(())
 }
 
-pub async fn delete_extra_chaps(chp_ids: &[&str], conn: impl Executor<'_, Database = MySql> + Copy,) -> Result<()> {
+pub async fn delete_extra_chaps(
+    chp_ids: &[&str],
+    conn: impl Executor<'_, Database = MySql> + Copy,
+) -> Result<()> {
     for t in chp_ids {
         sqlx::query!("DELETE FROM chapter_page where chapter_id = ?", t)
             .execute(conn)
@@ -58,7 +61,10 @@ pub async fn delete_extra_chaps(chp_ids: &[&str], conn: impl Executor<'_, Databa
     Ok(())
 }
 
-pub async fn add_extra_chaps(chps: &[ChapterTable], conn: impl Executor<'_, Database = MySql> + Copy,) -> Result<()> {
+pub async fn add_extra_chaps(
+    chps: &[ChapterTable],
+    conn: impl Executor<'_, Database = MySql> + Copy,
+) -> Result<()> {
     for lat in chps {
         sqlx::query!("INSERT INTO chapter(chapter_name, chapter_number, updated_at, chapter_id, manga_id, sequence_number, last_watch_time) VALUES(?, ?, ?, ?, ?, ?, ?)", lat.chapter_name, lat.chapter_number, lat.updated_at, lat.chapter_id, lat.manga_id, lat.sequence_number, lat.last_watch_time).execute(conn).await?;
 

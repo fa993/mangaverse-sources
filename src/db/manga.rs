@@ -8,8 +8,8 @@ use mangaverse_entity::models::manga::MangaTable;
 use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
-use sqlx::types::chrono::NaiveDateTime;
-use sqlx::{FromRow, MySql, Row, Executor};
+use sqlx::types::chrono::{NaiveDateTime, Utc};
+use sqlx::{Executor, FromRow, MySql, Row};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -72,7 +72,6 @@ pub async fn update_manga(
     conn: impl Executor<'_, Database = MySql> + Copy,
     c: &Context,
 ) -> Result<()> {
-
     println!("Watching {}", url);
 
     let stored = get_manga(url, conn, c).await?;
@@ -129,6 +128,14 @@ pub async fn update_manga(
             println!("No chapter updates for {}", url);
         }
     }
+
+    sqlx::query!(
+        "UPDATE manga SET last_watch_time = ? where manga_id = ?",
+        Utc::now().timestamp_millis(),
+        stored.id
+    )
+    .execute(conn)
+    .await?;
 
     Ok(())
 }
@@ -209,7 +216,10 @@ pub async fn get_manga<'a>(
     Ok(r.contents)
 }
 
-pub async fn get_chapters(id: &str, conn: impl Executor<'_, Database = MySql> + Copy,) -> Result<Vec<ChapterTable>> {
+pub async fn get_chapters(
+    id: &str,
+    conn: impl Executor<'_, Database = MySql> + Copy,
+) -> Result<Vec<ChapterTable>> {
     //do a hack
     //use group concat to eliminate multiple sql calls and speed shit up
     //use space as separator

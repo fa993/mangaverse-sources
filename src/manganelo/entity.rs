@@ -65,14 +65,8 @@ pub async fn get_manga<'a>(
     mng.url = url;
 
     {
-
-        let doc = Html::parse_document(
-            reqwest::get(mng.url.as_str())
-                .await?
-                .text()
-                .await?
-                .as_str(),
-        );
+        let doc =
+            Html::parse_document(reqwest::get(mng.url.as_str()).await?.text().await?.as_str());
 
         mng.name.extend(
             doc.select(&NAME_SELECTOR)
@@ -215,7 +209,6 @@ pub async fn get_manga<'a>(
         for t in mng.chapters.iter_mut() {
             t.sequence_number = sz - t.sequence_number - 1;
         }
-
     }
 
     Ok(mng)
@@ -224,15 +217,15 @@ pub async fn get_manga<'a>(
 async fn populate_chapter(url_chp: &str) -> Result<Vec<PageTable>> {
     Ok(
         Html::parse_document(reqwest::get(url_chp).await?.text().await?.as_str())
-        .select(&IMAGES_SELECTOR)
-        .filter_map(|f| f.value().attr("src"))
-        .map(ToString::to_string)
-        .enumerate()
-        .map(|(idx, u)| PageTable {
-            url: u,
-            page_number: idx as i32,
-            ..Default::default()
-        })
-        .collect()
+            .select(&IMAGES_SELECTOR)
+            .filter_map(|f| f.value().attr("src"))
+            .map(ToString::to_string)
+            .enumerate()
+            .map(|(idx, u)| PageTable {
+                url: u,
+                page_number: idx as i32,
+                ..Default::default()
+            })
+            .collect(),
     )
 }

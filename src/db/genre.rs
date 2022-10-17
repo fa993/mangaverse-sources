@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use mangaverse_entity::models::genre::Genre;
-use sqlx::{MySql, QueryBuilder, Executor};
+use sqlx::{Executor, MySql, QueryBuilder};
 use uuid::Uuid;
 
 use crate::Result;
