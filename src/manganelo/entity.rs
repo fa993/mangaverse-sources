@@ -64,151 +64,166 @@ pub async fn get_manga<'a>(
     mng.is_listed = true;
     mng.url = url;
 
-    let doc = Html::parse_document(
-        reqwest::get(mng.url.as_str())
-            .await?
-            .text()
-            .await?
-            .as_str(),
-    );
+    {
 
-    mng.name.extend(
-        doc.select(&NAME_SELECTOR)
-            .next()
-            .ok_or(MSError::TextParseError)?
-            .text(),
-    );
+        let doc = Html::parse_document(
+            reqwest::get(mng.url.as_str())
+                .await?
+                .text()
+                .await?
+                .as_str(),
+        );
 
-    mng.name = mng.name.trim().to_string();
+        mng.name.extend(
+            doc.select(&NAME_SELECTOR)
+                .next()
+                .ok_or(MSError::TextParseError)?
+                .text(),
+        );
 
-    mng.titles.push(mng.name.clone());
+        mng.name = mng.name.trim().to_string();
 
-    mng.cover_url.push_str(
-        doc.select(&COVERURL_SELECTOR)
-            .next()
-            .and_then(|f| f.value().attr("src"))
-            .ok_or(MSError::TextParseError)?,
-    );
+        mng.titles.push(mng.name.clone());
 
-    let iter_label = doc.select(&METADATA_LABEL_SELECTOR);
-    let iter_value = doc.select(&METADATA_VALUE_SELECTOR);
+        mng.cover_url.push_str(
+            doc.select(&COVERURL_SELECTOR)
+                .next()
+                .and_then(|f| f.value().attr("src"))
+                .ok_or(MSError::TextParseError)?,
+        );
 
-    let metadata_table = iter_label.zip(iter_value);
+        let iter_label = doc.select(&METADATA_LABEL_SELECTOR);
+        let iter_value = doc.select(&METADATA_VALUE_SELECTOR);
 
-    for (label, value) in metadata_table {
-        match label.text().collect::<String>().as_str() {
-            AUTHOR => mng.authors.extend(
-                value
-                    .text()
-                    .collect::<String>()
-                    .split(&['-'])
-                    .map(str::trim)
-                    .map(ToString::to_string),
-            ),
-            ALTERNATIVE_NAME => mng.titles.extend(
-                value
-                    .text()
-                    .collect::<String>()
-                    .split(&[',', ';'])
-                    .map(str::trim)
-                    .map(ToString::to_string),
-            ),
-            STATUS => mng
-                .status
-                .extend(value.text().map(|f| f.trim().to_uppercase())),
-            GENRES => mng.genres.extend(
-                value
-                    .text()
-                    .collect::<String>()
-                    .split(&['-'])
-                    .map(str::trim)
-                    .map(str::to_lowercase)
-                    .filter_map(|f| map.get(&f)),
-            ),
-            _ => {}
-        };
-    }
+        let metadata_table = iter_label.zip(iter_value);
 
-    let iter_label = doc.select(&UPDATED_LABEL_SELECTOR);
-    let iter_value = doc.select(&UPDATED_VALUE_SELECTOR);
-
-    let metadata_table = iter_label.zip(iter_value);
-
-    for (label, value) in metadata_table {
-        if label.text().collect::<String>() == UPDATED {
-            let y = value.text().collect::<String>();
-            let x = y[0..y.len() - 3].trim();
-            mng.last_updated = NaiveDateTime::parse_from_str(x, "%b %d,%Y - %H:%M").ok();
+        for (label, value) in metadata_table {
+            match label.text().collect::<String>().as_str() {
+                AUTHOR => mng.authors.extend(
+                    value
+                        .text()
+                        .collect::<String>()
+                        .split(&['-'])
+                        .map(str::trim)
+                        .map(ToString::to_string),
+                ),
+                ALTERNATIVE_NAME => mng.titles.extend(
+                    value
+                        .text()
+                        .collect::<String>()
+                        .split(&[',', ';'])
+                        .map(str::trim)
+                        .map(ToString::to_string),
+                ),
+                STATUS => mng
+                    .status
+                    .extend(value.text().map(|f| f.trim().to_uppercase())),
+                GENRES => mng.genres.extend(
+                    value
+                        .text()
+                        .collect::<String>()
+                        .split(&['-'])
+                        .map(str::trim)
+                        .map(str::to_lowercase)
+                        .filter_map(|f| map.get(&f)),
+                ),
+                _ => {}
+            };
         }
-    }
 
-    if let Some(x) = doc.select(&DESCRIPTION_SELECTOR).next() {
-        let mut u = x.text().collect::<String>();
-        u.drain(0..=13);
-        mng.description.push_str(u.as_str().trim());
-    }
+        let iter_label = doc.select(&UPDATED_LABEL_SELECTOR);
+        let iter_value = doc.select(&UPDATED_VALUE_SELECTOR);
 
-    let iter_label = doc.select(&CHAPTER_LABEL_SELECTOR);
-    let iter_value = doc.select(&CHAPTER_VALUE_SELECTOR);
+        let metadata_table = iter_label.zip(iter_value);
 
-    let chapter_table = iter_label.zip(iter_value);
-
-    for (idx, (t1, t2)) in chapter_table.enumerate() {
-        let mut t = ChapterTable {
-            sequence_number: idx as i32,
-            last_watch_time: Utc::now().timestamp_millis(),
-            updated_at: NaiveDateTime::parse_from_str(
-                t2.value().attr("title").unwrap_or("").trim(),
-                "%b %d,%Y %H:%M",
-            )
-            .ok(),
-            ..Default::default()
-        };
-
-        let t1_text = t1.text().collect::<String>();
-        let y = t1_text.find(':');
-        let chp = t1_text.find("Chapter");
-        t.chapter_name = t1_text.clone();
-        if chp.is_none() {
-            t.chapter_name = t1_text;
-        } else if y.is_some() {
-            let act_y = y.unwrap();
-            let act_chp = chp.unwrap();
-            if act_y + 2 < t1_text.len() {
-                t.chapter_name = t1_text[act_y + 2..].trim().to_string();
-            }
-            if act_y < t1_text.len() && act_chp + "Chapter".len() + 1 < t1_text.len() {
-                t.chapter_number = t1_text[act_chp + "Chapter".len() + 1..act_y]
-                    .trim()
-                    .to_string();
-            }
-        } else {
-            let act_chp = chp.unwrap();
-            if act_chp + "Chapter".len() + 1 < t1_text.len() {
-                t.chapter_number = t1_text[act_chp + "Chapter".len() + 1..].trim().to_string()
+        for (label, value) in metadata_table {
+            if label.text().collect::<String>() == UPDATED {
+                let y = value.text().collect::<String>();
+                let x = y[0..y.len() - 3].trim();
+                mng.last_updated = NaiveDateTime::parse_from_str(x, "%b %d,%Y - %H:%M").ok();
             }
         }
 
-        if let Some(url_chp) = t1.value().attr("href") {
-            populate_chapter(&mut t, url_chp).await;
+        if let Some(x) = doc.select(&DESCRIPTION_SELECTOR).next() {
+            let mut u = x.text().collect::<String>();
+            u.drain(0..=13);
+            mng.description.push_str(u.as_str().trim());
         }
 
-        mng.chapters.push(t);
+        let iter_label = doc.select(&CHAPTER_LABEL_SELECTOR);
+        let iter_value = doc.select(&CHAPTER_VALUE_SELECTOR);
+
+        let chapter_table = iter_label.zip(iter_value);
+
+        for (idx, (t1, t2)) in chapter_table.enumerate() {
+            let mut t = ChapterTable {
+                sequence_number: idx as i32,
+                last_watch_time: Utc::now().timestamp_millis(),
+                updated_at: NaiveDateTime::parse_from_str(
+                    t2.value().attr("title").unwrap_or("").trim(),
+                    "%b %d,%Y %H:%M",
+                )
+                .ok(),
+                ..Default::default()
+            };
+
+            let t1_text = t1.text().collect::<String>();
+            let y = t1_text.find(':');
+            let chp = t1_text.find("Chapter");
+            t.chapter_name = t1_text.clone();
+            if chp.is_none() {
+                t.chapter_name = t1_text;
+            } else if y.is_some() {
+                let act_y = y.unwrap();
+                let act_chp = chp.unwrap();
+                if act_y + 2 < t1_text.len() {
+                    t.chapter_name = t1_text[act_y + 2..].trim().to_string();
+                }
+                if act_y < t1_text.len() && act_chp + "Chapter".len() + 1 < t1_text.len() {
+                    t.chapter_number = t1_text[act_chp + "Chapter".len() + 1..act_y]
+                        .trim()
+                        .to_string();
+                }
+            } else {
+                let act_chp = chp.unwrap();
+                if act_chp + "Chapter".len() + 1 < t1_text.len() {
+                    t.chapter_number = t1_text[act_chp + "Chapter".len() + 1..].trim().to_string()
+                }
+            }
+
+            if let Some(url_chp) = t1.value().attr("href") {
+                t.chapter_id = url_chp.to_string();
+            }
+
+            mng.chapters.push(t);
+        }
     }
 
-    mng.chapters.reverse();
+    {
+        for yt in mng.chapters.iter_mut() {
+            let res = populate_chapter(yt.chapter_id.as_str()).await;
 
-    let sz = mng.chapters.len() as i32;
+            if res.is_ok() {
+                yt.pages = res.unwrap();
+            }
+        }
 
-    for t in mng.chapters.iter_mut() {
-        t.sequence_number = sz - t.sequence_number - 1;
+        mng.chapters.reverse();
+
+        let sz = mng.chapters.len() as i32;
+
+        for t in mng.chapters.iter_mut() {
+            t.sequence_number = sz - t.sequence_number - 1;
+        }
+
     }
 
     Ok(mng)
 }
 
-async fn populate_chapter(t: &mut ChapterTable, url_chp: &str) -> Result<()> {
-    t.pages = Html::parse_document(reqwest::get(url_chp).await?.text().await?.as_str())
+async fn populate_chapter(url_chp: &str) -> Result<Vec<PageTable>> {
+    Ok(
+        Html::parse_document(reqwest::get(url_chp).await?.text().await?.as_str())
         .select(&IMAGES_SELECTOR)
         .filter_map(|f| f.value().attr("src"))
         .map(ToString::to_string)
@@ -218,6 +233,6 @@ async fn populate_chapter(t: &mut ChapterTable, url_chp: &str) -> Result<()> {
             page_number: idx as i32,
             ..Default::default()
         })
-        .collect();
-    Ok(())
+        .collect()
+    )
 }

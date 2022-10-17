@@ -71,95 +71,108 @@ pub async fn get_manga<'a>(
     mng.is_listed = true;
     mng.url = url;
 
-    let doc = Html::parse_document(
-        reqwest::get(mng.url.as_str())
-            .await?
-            .text()
-            .await?
-            .as_str(),
-    );
-
-    mng.name.extend(
-        doc.select(&NAME_SELECTOR)
-            .next()
-            .ok_or(MSError::TextParseError)?
-            .text(),
-    );
-
-    mng.name = mng.name.trim().to_string();
-
-    mng.titles.push(mng.name.clone());
-
-    mng.cover_url.push_str(WEBSITE_HOST);
-
-    mng.cover_url.push_str(
-        doc.select(&COVERURL_SELECTOR)
-            .next()
-            .and_then(|f| f.value().attr("src"))
-            .ok_or(MSError::TextParseError)?,
-    );
-
-    if let Some(x) = doc.select(&TITLES_SELECTOR).next() {
-        mng.titles.extend(
-            x.text()
-                .collect::<String>()
-                .split(&[',', ';'])
-                .map(|t| t.trim().to_string()),
+    {
+        let doc = Html::parse_document(
+            reqwest::get(mng.url.as_str())
+                .await?
+                .text()
+                .await?
+                .as_str(),
         );
-    }
 
-    if let Some(x) = doc.select(&SUMMARY_SELECTOR).next() {
-        mng.description
-            .extend(x.select(&DESCRIPTION_SELECTOR).flat_map(|f| f.text()));
-
-        mng.description = mng.description.trim().to_string();
-
-        mng.genres.extend(
-            x.select(&MANGA_GENRE_SELECTOR)
-                .filter_map(|f| map.get(f.text().collect::<String>().to_lowercase().trim())),
+        mng.name.extend(
+            doc.select(&NAME_SELECTOR)
+                .next()
+                .ok_or(MSError::TextParseError)?
+                .text(),
         );
-    }
 
-    if let Some(x) = doc.select(&STATUS_SELECTOR).next() {
-        mng.status.extend(x.text());
-        mng.status = mng.status.trim().to_uppercase();
-    } else {
-        mng.status.push_str("Not Available");
-    }
+        mng.name = mng.name.trim().to_string();
 
-    if let Some(x) = doc.select(&AUTHOR_SELECTOR).next() {
-        mng.authors
-            .push(x.text().collect::<String>().trim().to_string());
-    }
+        mng.titles.push(mng.name.clone());
 
-    if let Some(x) = doc.select(&ARTIST_SELECTOR).next() {
-        mng.artists
-            .push(x.text().collect::<String>().trim().to_string());
-    }
+        mng.cover_url.push_str(WEBSITE_HOST);
 
-    for (idx, i) in doc.select(&CHAPTER_SELECTOR).enumerate() {
-        if let Some(x) = i.value().attr("href") {
-            let mut t = ChapterTable {
-                sequence_number: idx as i32,
-                last_watch_time: Utc::now().timestamp_millis(),
-                ..Default::default()
-            };
-            let mut r = String::from(WEBSITE_HOST);
-            r.push_str(x);
-            populate_chapter(&mut t, r.as_str()).await;
+        mng.cover_url.push_str(
+            doc.select(&COVERURL_SELECTOR)
+                .next()
+                .and_then(|f| f.value().attr("src"))
+                .ok_or(MSError::TextParseError)?,
+        );
 
-            mng.chapters.push(t);
+        if let Some(x) = doc.select(&TITLES_SELECTOR).next() {
+            mng.titles.extend(
+                x.text()
+                    .collect::<String>()
+                    .split(&[',', ';'])
+                    .map(|t| t.trim().to_string()),
+            );
+        }
+
+        if let Some(x) = doc.select(&SUMMARY_SELECTOR).next() {
+            mng.description
+                .extend(x.select(&DESCRIPTION_SELECTOR).flat_map(|f| f.text()));
+
+            mng.description = mng.description.trim().to_string();
+
+            mng.genres.extend(
+                x.select(&MANGA_GENRE_SELECTOR)
+                    .filter_map(|f| map.get(f.text().collect::<String>().to_lowercase().trim())),
+            );
+        }
+
+        if let Some(x) = doc.select(&STATUS_SELECTOR).next() {
+            mng.status.extend(x.text());
+            mng.status = mng.status.trim().to_uppercase();
+        } else {
+            mng.status.push_str("Not Available");
+        }
+
+        if let Some(x) = doc.select(&AUTHOR_SELECTOR).next() {
+            mng.authors
+                .push(x.text().collect::<String>().trim().to_string());
+        }
+
+        if let Some(x) = doc.select(&ARTIST_SELECTOR).next() {
+            mng.artists
+                .push(x.text().collect::<String>().trim().to_string());
+        }
+
+        for (idx, i) in doc.select(&CHAPTER_SELECTOR).enumerate() {
+            if let Some(x) = i.value().attr("href") {
+                let mut t = ChapterTable {
+                    sequence_number: idx as i32,
+                    last_watch_time: Utc::now().timestamp_millis(),
+                    ..Default::default()
+                };
+                let mut r = String::from(WEBSITE_HOST);
+                r.push_str(x);
+                
+                t.chapter_id = r.to_string();
+
+                mng.chapters.push(t);
+            }
         }
     }
 
-    mng.chapters.reverse();
+    {
 
-    let sz = mng.chapters.len() as i32;
+        for yt in mng.chapters.iter_mut() {
+            let r = yt.chapter_id.clone();
+            populate_chapter(yt, r.as_str()).await;
+        }
 
-    for t in mng.chapters.iter_mut() {
-        t.sequence_number = sz - t.sequence_number - 1;
+        mng.chapters.reverse();
+
+        let sz = mng.chapters.len() as i32;
+
+        for t in mng.chapters.iter_mut() {
+            t.sequence_number = sz - t.sequence_number - 1;
+        }
+
     }
 
+    
     Ok(mng)
 }
 
