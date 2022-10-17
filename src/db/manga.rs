@@ -9,7 +9,7 @@ use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::NaiveDateTime;
-use sqlx::{FromRow, MySql, Pool, Row, Executor};
+use sqlx::{FromRow, MySql, Row, Executor};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -69,10 +69,10 @@ impl FromRow<'_, MySqlRow> for MangaTableWrapper<'_> {
 pub async fn update_manga(
     url: &str,
     mng: &mut MangaTable<'_>,
-    pool: &Pool<MySql>,
+    conn: impl Executor<'_, Database = MySql> + Copy,
     c: &Context,
 ) -> Result<()> {
-    let stored = get_manga(url, pool, c).await?;
+    let stored = get_manga(url, conn, c).await?;
 
     let t = stored.name == mng.name
         && stored.cover_url == mng.cover_url
@@ -82,7 +82,7 @@ pub async fn update_manga(
 
     if !t {
         // update sql
-        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(& *pool).await?;
+        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(conn).await?;
     }
 
     //handle collection updates probably by a generic function
@@ -90,7 +90,7 @@ pub async fn update_manga(
     let fut = stored.chapters.iter().zip(mng.chapters.iter());
 
     for (a, b) in fut {
-        let f = update_chapter(a, b, pool).await;
+        let f = update_chapter(a, b, conn).await;
         if f.is_err() {
             println!("{}", f.err().unwrap())
         }
@@ -103,7 +103,7 @@ pub async fn update_manga(
                 r.chapter_id = Uuid::new_v4().to_string();
                 r.manga_id = stored.id.clone();
             }
-            add_extra_chaps(&mng.chapters[stored.chapters.len()..], pool).await?;
+            add_extra_chaps(&mng.chapters[stored.chapters.len()..], conn).await?;
         }
         Ordering::Greater => {
             //delete extra
@@ -115,7 +115,7 @@ pub async fn update_manga(
                     .map(|f| f.chapter_id.as_str())
                     .collect::<Vec<_>>()
                     .as_slice(),
-                pool,
+                conn,
             )
             .await?;
         }
