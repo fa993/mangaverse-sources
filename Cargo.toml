@@ -6,16 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = "0.3.24"
 scraper = "0.13.0"
 isahc = "1.7.2"
 thiserror = "1.0.36"
 mangaverse-entity = {git = "https://github.com/fa993/mangaverse-entity", rev = "9c6c867"}
 uuid = {version = "1.1.2", features = ["v4"]}
-tuple-conv = "1.0.1"
 lazy_static = "1.4.0"
 itertools = "0.10.5"
 
 [dependencies.sqlx]
 version = "0.5.13"
 features = ["mysql", "chrono", "macros"]
+
+[dev-dependencies.sqlx]
+version = "0.5.13"
+features = ["mysql", "chrono", "macros", "runtime-tokio-rustls"]
