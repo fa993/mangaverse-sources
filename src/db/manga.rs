@@ -9,7 +9,7 @@ use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::NaiveDateTime;
-use sqlx::{FromRow, Row, MySql, Pool};
+use sqlx::{FromRow, MySql, Pool, Row};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -132,7 +132,7 @@ pub async fn get_manga<'a>(
 ) -> Result<MangaTable<'a>> {
     let mut r: MangaTableWrapper<'a> = sqlx::query_as("SELECT * from manga where url = ?")
         .bind(url)
-        .fetch_one(& *pool)
+        .fetch_one(&*pool)
         .await?;
 
     pub type RowWrapperString = RowWrapper<String>;
@@ -142,7 +142,7 @@ pub async fn get_manga<'a>(
         "SELECT title as data from title where linked_id = ?",
         r.contents.linked_id
     )
-    .fetch_all(& *pool)
+    .fetch_all(&*pool)
     .await?
     .into_iter()
     .map(Into::into)
@@ -189,7 +189,7 @@ pub async fn get_manga<'a>(
                 "SELECT source_id as data from source where source_id = ?",
                 r.source_id
             )
-            .fetch_one(& *pool)
+            .fetch_one(&*pool)
             .await?
             .data
             .as_str(),

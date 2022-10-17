@@ -1,5 +1,5 @@
 use mangaverse_entity::models::chapter::ChapterTable;
-use sqlx::{QueryBuilder, MySql, Pool};
+use sqlx::{MySql, Pool, QueryBuilder};
 
 use crate::Result;
 
@@ -28,7 +28,7 @@ pub async fn update_chapter(
             "DELETE FROM chapter_page where chapter_id = ?",
             ori.chapter_id
         )
-        .execute(& *pool)
+        .execute(&*pool)
         .await?;
 
         //add new
@@ -40,7 +40,7 @@ pub async fn update_chapter(
             b.push_bind(page.chapter_id.as_str());
         });
 
-        q.build().execute(& *pool).await?;
+        q.build().execute(&*pool).await?;
     }
 
     Ok(())
@@ -49,10 +49,10 @@ pub async fn update_chapter(
 pub async fn delete_extra_chaps(chp_ids: &[&str], pool: &Pool<MySql>) -> Result<()> {
     for t in chp_ids {
         sqlx::query!("DELETE FROM chapter_page where chapter_id = ?", t)
-            .execute(& *pool)
+            .execute(&*pool)
             .await?;
         sqlx::query!("DELETE FROM chapter where chapter_id = ?", t)
-            .execute(& *pool)
+            .execute(&*pool)
             .await?;
     }
     Ok(())
@@ -70,7 +70,7 @@ pub async fn add_extra_chaps(chps: &[ChapterTable], pool: &Pool<MySql>) -> Resul
             b.push_bind(lat.chapter_id.as_str());
         });
 
-        q.build().execute(& *pool).await?;
+        q.build().execute(&*pool).await?;
     }
 
     Ok(())
