@@ -72,6 +72,9 @@ pub async fn update_manga(
     conn: impl Executor<'_, Database = MySql> + Copy,
     c: &Context,
 ) -> Result<()> {
+
+    println!("Watching {}", url);
+
     let stored = get_manga(url, conn, c).await?;
 
     let t = stored.name == mng.name
@@ -81,6 +84,7 @@ pub async fn update_manga(
         && stored.description == mng.description;
 
     if !t {
+        println!("Updating Metadata for {}", url);
         // update sql
         sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(conn).await?;
     }
@@ -99,6 +103,7 @@ pub async fn update_manga(
     match stored.chapters.len().cmp(&mng.chapters.len()) {
         Ordering::Less => {
             //add extra
+            println!("Yay! New Chapters added for {}", url);
             for r in &mut mng.chapters[stored.chapters.len()..] {
                 r.chapter_id = Uuid::new_v4().to_string();
                 r.manga_id = stored.id.clone();
@@ -107,6 +112,7 @@ pub async fn update_manga(
         }
         Ordering::Greater => {
             //delete extra
+            println!("Deleting chapters for {}... strange", url);
             delete_extra_chaps(
                 stored
                     .chapters
@@ -119,7 +125,9 @@ pub async fn update_manga(
             )
             .await?;
         }
-        _ => {}
+        _ => {
+            println!("No chapter updates for {}", url);
+        }
     }
 
     Ok(())
