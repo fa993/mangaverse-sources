@@ -6,7 +6,7 @@ use mangaverse_entity::models::source::SourceTable;
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
 
-use crate::{readm::insert_source_if_not_exists, Result};
+use crate::{db::source::insert_source_if_not_exists, Result};
 
 const SOURCE_NAME: &str = "mangadino";
 

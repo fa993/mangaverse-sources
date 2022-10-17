@@ -2,8 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{Context, Result};
 use futures::future::join_all;
-use futures::{try_join, TryFutureExt};
-use itertools::Itertools;
+use futures::try_join;
 use lazy_static::lazy_static;
 use mangaverse_entity::models::chapter::ChapterTable;
 use mangaverse_entity::models::manga::MangaTable;

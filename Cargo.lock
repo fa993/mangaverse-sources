@@ -818,7 +818,6 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "isahc",
- "itertools",
  "lazy_static",
  "mangaverse-entity",
  "scraper",

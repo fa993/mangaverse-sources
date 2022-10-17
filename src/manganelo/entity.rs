@@ -11,7 +11,7 @@ use sqlx::{
 
 use lazy_static::lazy_static;
 
-use crate::{readm::insert_source_if_not_exists, Error, Result};
+use crate::{db::source::insert_source_if_not_exists, Error, Result};
 
 const AUTHOR: &str = "Author(s) :";
 const ALTERNATIVE_NAME: &str = "Alternative :";

@@ -11,7 +11,7 @@ use sqlx::{
 
 use crate::{Error, Result};
 
-use super::insert_source_if_not_exists;
+use crate::db::source::insert_source_if_not_exists;
 
 use lazy_static::lazy_static;
 
