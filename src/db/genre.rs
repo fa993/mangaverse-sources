@@ -20,13 +20,13 @@ pub async fn insert_genre(
 
     q.push(" ON DUPLICATE KEY update genre_id = genre_id");
 
-    q.build().execute(&*pool).await?;
+    q.build().execute(pool).await?;
 
     let all = sqlx::query_as!(
         Genre,
         "SELECT genre.genre_id as id, genre.name from genre order by genre.name ASC"
     )
-    .fetch_all(&*pool)
+    .fetch_all(pool)
     .await?;
 
     out.extend(all.into_iter().map(|f| (f.name.to_string(), f)));
