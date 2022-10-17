@@ -9,7 +9,7 @@ use sqlx::{
     MySql, Pool,
 };
 
-use crate::{Error, Result};
+use crate::{MSError, Result};
 
 use crate::db::source::insert_source_if_not_exists;
 
@@ -82,7 +82,7 @@ pub async fn get_manga<'a>(
     mng.name.extend(
         doc.select(&NAME_SELECTOR)
             .next()
-            .ok_or(Error::TextParseError)?
+            .ok_or(MSError::TextParseError)?
             .text(),
     );
 
@@ -96,7 +96,7 @@ pub async fn get_manga<'a>(
         doc.select(&COVERURL_SELECTOR)
             .next()
             .and_then(|f| f.value().attr("src"))
-            .ok_or(Error::TextParseError)?,
+            .ok_or(MSError::TextParseError)?,
     );
 
     if let Some(x) = doc.select(&TITLES_SELECTOR).next() {

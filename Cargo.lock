@@ -757,7 +757,6 @@ dependencies = [
  "reqwest",
  "scraper",
  "sqlx",
- "thiserror",
  "uuid",
 ]
 

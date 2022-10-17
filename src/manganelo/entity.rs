@@ -11,7 +11,7 @@ use sqlx::{
 
 use lazy_static::lazy_static;
 
-use crate::{db::source::insert_source_if_not_exists, Error, Result};
+use crate::{db::source::insert_source_if_not_exists, MSError, Result};
 
 const AUTHOR: &str = "Author(s) :";
 const ALTERNATIVE_NAME: &str = "Alternative :";
@@ -75,7 +75,7 @@ pub async fn get_manga<'a>(
     mng.name.extend(
         doc.select(&NAME_SELECTOR)
             .next()
-            .ok_or(Error::TextParseError)?
+            .ok_or(MSError::TextParseError)?
             .text(),
     );
 
@@ -87,7 +87,7 @@ pub async fn get_manga<'a>(
         doc.select(&COVERURL_SELECTOR)
             .next()
             .and_then(|f| f.value().attr("src"))
-            .ok_or(Error::TextParseError)?,
+            .ok_or(MSError::TextParseError)?,
     );
 
     let iter_label = doc.select(&METADATA_LABEL_SELECTOR);

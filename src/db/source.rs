@@ -3,7 +3,7 @@ use sqlx::MySql;
 use sqlx::Pool;
 use uuid::Uuid;
 
-use crate::Error;
+use crate::MSError;
 use crate::Result;
 
 pub async fn insert_source_if_not_exists(
@@ -19,7 +19,7 @@ pub async fn insert_source_if_not_exists(
     .fetch_optional(pool)
     .await?;
     if exists.is_some() {
-        exists.ok_or(Error::NoError)
+        exists.ok_or(MSError::NoError)
     } else {
         let y = SourceTable {
             id: Uuid::new_v4().to_string(),

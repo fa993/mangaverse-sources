@@ -92,7 +92,7 @@ pub async fn update_manga(
     for (a, b) in fut {
         let f = update_chapter(a, b, conn).await;
         if f.is_err() {
-            println!("{}", f.err().unwrap())
+            println!("{:#?}", f.err().unwrap())
         }
     }
 

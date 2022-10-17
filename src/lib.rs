@@ -1,39 +1,50 @@
 use std::collections::HashMap;
 
 // use crate::db::{genre::insert_genre, manga::{get_manga, update_manga}};
-// use futures::join;
 use mangaverse_entity::models::{genre::Genre, source::SourceTable};
 // use sqlx::mysql::MySqlPoolOptions;
-use thiserror::Error;
-// use tuple_conv::RepeatedTuple;
 
 pub mod db;
 pub mod mangadino;
 pub mod manganelo;
 pub mod readm;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, MSError>;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Text Parse Error")]
+#[derive(Debug, Clone)]
+pub enum MSError {
+
     TextParseError,
 
-    #[error(transparent)]
-    SQLError(#[from] sqlx::Error),
+    SQLError,
 
-    #[error(transparent)]
-    NetworkError(#[from] reqwest::Error),
+    NetworkError,
 
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    IOError,
 
-    #[error(transparent)]
-    OtherError(#[from] Box<dyn std::error::Error>),
+    OtherError,
 
-    #[error("You shouldn't be seeing this")]
     NoError,
 }
+
+impl From<sqlx::Error> for MSError {
+    fn from(_: sqlx::Error) -> Self {
+        Self::SQLError
+    }
+}
+
+impl From<reqwest::Error> for MSError {
+    fn from(_: reqwest::Error) -> Self {
+        Self::NetworkError
+    }
+}
+
+impl From<std::io::Error> for MSError {
+    fn from(_: std::io::Error) -> Self {
+        Self::IOError
+    }
+}
+
 
 #[derive(Default, Debug)]
 pub struct Context {
