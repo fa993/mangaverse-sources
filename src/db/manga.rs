@@ -223,6 +223,18 @@ pub async fn get_manga<'a>(
     Ok(r.contents)
 }
 
+struct ChapterAndPages {
+    pub chapter_id: String,
+    pub chapter_name: String,
+    pub chapter_number: String,
+    pub updated_at: Option<NaiveDateTime>,
+    pub manga_id: String,
+    pub last_watch_time: i64,
+    pub sequence_number: i32,
+
+    pub all_pages: Option<String>,
+}
+
 pub async fn get_chapters(
     id: &str,
     conn: impl Executor<'_, Database = MySql> + Copy,
@@ -230,18 +242,6 @@ pub async fn get_chapters(
     //do a hack
     //use group concat to eliminate multiple sql calls and speed shit up
     //use space as separator
-
-    struct ChapterAndPages {
-        pub chapter_id: String,
-        pub chapter_name: String,
-        pub chapter_number: String,
-        pub updated_at: Option<NaiveDateTime>,
-        pub manga_id: String,
-        pub last_watch_time: i64,
-        pub sequence_number: i32,
-
-        pub all_pages: Option<String>,
-    }
 
     let y = sqlx::query_as!(ChapterAndPages, "SELECT chapter.*, group_concat(chapter_page.chapter_page_id, ' ' ,chapter_page.url, ' ', chapter_page.page_number, ' ', chapter_page.chapter_id SEPARATOR ' ') as all_pages from chapter, chapter_page where chapter_page.chapter_id = chapter.chapter_id and chapter.manga_id = ? group by chapter_id order by sequence_number ASC", id).fetch_all(conn).await?;
 
