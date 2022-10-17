@@ -37,7 +37,7 @@ pub async fn update_chapter(
         q.push_values(lat.pages.as_slice(), |mut b, page| {
             b.push_bind(page.url.as_str());
             b.push_bind(page.page_number);
-            b.push_bind(page.chapter_id.as_str());
+            b.push_bind(ori.chapter_id.as_str());
         });
 
         q.build().execute(conn).await?;
