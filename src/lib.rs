@@ -37,8 +37,8 @@ pub enum Error {
 
 #[derive(Default, Debug)]
 pub struct Context {
-    sources: HashMap<String, SourceTable>,
-    genres: HashMap<String, Genre>,
+    pub sources: HashMap<String, SourceTable>,
+    pub genres: HashMap<String, Genre>,
 }
 
 // async fn setup_db() -> Result<sqlx::Pool<sqlx::MySql>> {
