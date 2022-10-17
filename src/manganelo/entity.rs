@@ -7,7 +7,7 @@ use mangaverse_entity::models::{
 use scraper::{Html, Selector};
 use sqlx::{
     types::chrono::{NaiveDateTime, Utc},
-    MySqlPool,
+    MySql, Pool,
 };
 
 use lazy_static::lazy_static;
@@ -51,7 +51,7 @@ pub async fn get_manganelo_genres() -> Result<HashSet<String>> {
         .collect())
 }
 
-pub async fn get_manganelo_source(pool: &MySqlPool) -> Result<SourceTable> {
+pub async fn get_manganelo_source(pool: &Pool<MySql>) -> Result<SourceTable> {
     insert_source_if_not_exists(SOURCE_NAME, 2, pool).await
 }
 

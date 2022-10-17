@@ -1,5 +1,6 @@
 use mangaverse_entity::models::source::SourceTable;
-use sqlx::MySqlPool;
+use sqlx::MySql;
+use sqlx::Pool;
 use uuid::Uuid;
 
 use crate::Error;
@@ -8,14 +9,14 @@ use crate::Result;
 pub async fn insert_source_if_not_exists(
     src_name: &str,
     pri: i32,
-    pool: &MySqlPool,
+    pool: &Pool<MySql>,
 ) -> Result<SourceTable> {
     let exists = sqlx::query_as!(
         SourceTable,
         "select source_id as id, name, priority from source where name = ?",
         src_name
     )
-    .fetch_optional(pool)
+    .fetch_optional(& *pool)
     .await?;
     if exists.is_some() {
         exists.ok_or(Error::NoError)
@@ -31,7 +32,7 @@ pub async fn insert_source_if_not_exists(
             y.name.as_str(),
             y.priority
         )
-        .execute(pool)
+        .execute(& *pool)
         .await?;
         Ok(y)
     }

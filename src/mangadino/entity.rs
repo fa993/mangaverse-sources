@@ -4,7 +4,7 @@ use isahc::prelude::*;
 use lazy_static::lazy_static;
 use mangaverse_entity::models::source::SourceTable;
 use scraper::{Html, Selector};
-use sqlx::MySqlPool;
+use sqlx::{MySql, Pool};
 
 use crate::{db::source::insert_source_if_not_exists, Result};
 
@@ -40,6 +40,6 @@ pub async fn get_mangadino_genres() -> Result<HashSet<String>> {
         .collect())
 }
 
-pub async fn get_mangadino_source(pool: &MySqlPool) -> Result<SourceTable> {
+pub async fn get_mangadino_source(pool: &Pool<MySql>) -> Result<SourceTable> {
     insert_source_if_not_exists(SOURCE_NAME, 3, pool).await
 }

@@ -9,7 +9,7 @@ use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::NaiveDateTime;
-use sqlx::{FromRow, MySqlPool, Row};
+use sqlx::{FromRow, Row, MySql, Pool};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -69,7 +69,7 @@ impl FromRow<'_, MySqlRow> for MangaTableWrapper<'_> {
 pub async fn update_manga(
     url: &str,
     mng: &mut MangaTable<'_>,
-    pool: &MySqlPool,
+    pool: &Pool<MySql>,
     c: &Context,
 ) -> Result<()> {
     let stored = get_manga(url, pool, c).await?;
@@ -82,7 +82,7 @@ pub async fn update_manga(
 
     if !t {
         // update sql
-        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(pool).await?;
+        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(& *pool).await?;
     }
 
     //handle collection updates probably by a generic function
@@ -127,12 +127,12 @@ pub async fn update_manga(
 
 pub async fn get_manga<'a>(
     url: &'a str,
-    pool: &'a MySqlPool,
+    pool: &'a Pool<MySql>,
     c: &'a Context,
 ) -> Result<MangaTable<'a>> {
     let mut r: MangaTableWrapper<'a> = sqlx::query_as("SELECT * from manga where url = ?")
         .bind(url)
-        .fetch_one(pool)
+        .fetch_one(& *pool)
         .await?;
 
     pub type RowWrapperString = RowWrapper<String>;
@@ -142,7 +142,7 @@ pub async fn get_manga<'a>(
         "SELECT title as data from title where linked_id = ?",
         r.contents.linked_id
     )
-    .fetch_all(pool)
+    .fetch_all(& *pool)
     .await?
     .into_iter()
     .map(Into::into)
@@ -153,7 +153,7 @@ pub async fn get_manga<'a>(
         "SELECT author.name as data from author, manga_author where manga_author.author_id = author.author_id and manga_author.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(pool)
+    .fetch_all(& *pool)
     .await?
     .into_iter()
     .map(Into::into)
@@ -164,7 +164,7 @@ pub async fn get_manga<'a>(
         "SELECT author.name as data from author, manga_artist where manga_artist.author_id = author.author_id and manga_artist.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(pool)
+    .fetch_all(& *pool)
     .await?
     .into_iter()
     .map(Into::into)
@@ -175,7 +175,7 @@ pub async fn get_manga<'a>(
         "SELECT genre.name as data from genre, manga_genre where manga_genre.genre_id = genre.genre_id and manga_genre.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(pool)
+    .fetch_all(& *pool)
     .await?
     .into_iter()
     .filter_map(|f| c.genres.get(f.data.as_str()))
@@ -189,7 +189,7 @@ pub async fn get_manga<'a>(
                 "SELECT source_id as data from source where source_id = ?",
                 r.source_id
             )
-            .fetch_one(pool)
+            .fetch_one(& *pool)
             .await?
             .data
             .as_str(),
@@ -201,7 +201,7 @@ pub async fn get_manga<'a>(
     Ok(r.contents)
 }
 
-pub async fn get_chapters(id: &str, pool: &MySqlPool) -> Result<Vec<ChapterTable>> {
+pub async fn get_chapters(id: &str, pool: &Pool<MySql>) -> Result<Vec<ChapterTable>> {
     //do a hack
     //use group concat to eliminate multiple sql calls and speed shit up
     //use space as separator
@@ -218,7 +218,7 @@ pub async fn get_chapters(id: &str, pool: &MySqlPool) -> Result<Vec<ChapterTable
         pub all_pages: Option<String>,
     }
 
-    let y = sqlx::query_as!(ChapterAndPages, "SELECT chapter.*, group_concat(chapter_page.chapter_page_id, ' ' ,chapter_page.url, ' ', chapter_page.page_number, ' ', chapter_page.chapter_id SEPARATOR ' ') as all_pages from chapter, chapter_page where chapter_page.chapter_id = chapter.chapter_id and chapter.manga_id = ? group by chapter_id order by sequence_number ASC", id).fetch_all(pool).await?;
+    let y = sqlx::query_as!(ChapterAndPages, "SELECT chapter.*, group_concat(chapter_page.chapter_page_id, ' ' ,chapter_page.url, ' ', chapter_page.page_number, ' ', chapter_page.chapter_id SEPARATOR ' ') as all_pages from chapter, chapter_page where chapter_page.chapter_id = chapter.chapter_id and chapter.manga_id = ? group by chapter_id order by sequence_number ASC", id).fetch_all(& *pool).await?;
 
     Ok(y.into_iter()
         .map(|f| ChapterTable {

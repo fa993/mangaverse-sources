@@ -7,7 +7,7 @@ use mangaverse_entity::models::{
 use scraper::{Html, Selector};
 use sqlx::{
     types::chrono::{NaiveDateTime, Utc},
-    MySqlPool,
+    MySql, Pool,
 };
 
 use crate::{Error, Result};
@@ -38,7 +38,7 @@ lazy_static! {
     static ref IMAGES_SELECTOR: Selector = Selector::parse("img.img-responsive").unwrap();
 }
 
-pub async fn get_readm_source(pool: &MySqlPool) -> Result<SourceTable> {
+pub async fn get_readm_source(pool: &Pool<MySql>) -> Result<SourceTable> {
     insert_source_if_not_exists(SOURCE_NAME, 1, pool).await
 }
 
