@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use isahc::prelude::*;
 use mangaverse_entity::models::{
     chapter::ChapterTable, genre::Genre, manga::MangaTable, page::PageTable, source::SourceTable,
 };
@@ -45,7 +44,7 @@ pub async fn get_readm_source(pool: &Pool<MySql>) -> Result<SourceTable> {
 pub async fn get_readm_genres() -> Result<HashSet<String>> {
     let url = "https://readm.org/advanced-search";
 
-    let response_text = isahc::get_async(url).await?.text().await?;
+    let response_text = reqwest::get(url).await?.text().await?;
 
     let doc = Html::parse_document(&response_text);
 
@@ -73,7 +72,7 @@ pub async fn get_manga<'a>(
     mng.url = url;
 
     let doc = Html::parse_document(
-        isahc::get_async(mng.url.as_str())
+        reqwest::get(mng.url.as_str())
             .await?
             .text()
             .await?
@@ -165,7 +164,7 @@ pub async fn get_manga<'a>(
 }
 
 async fn populate_chapter(t: &mut ChapterTable, x: &str) -> Result<()> {
-    let y = Html::parse_document(&isahc::get_async(x).await?.text().await?);
+    let y = Html::parse_document(reqwest::get(x).await?.text().await?.as_str());
     if let Some(dt) = y.select(&CHAPTER_UPDATED_AT_SELECTOR).next() {
         let mut u = dt.text().collect::<String>().trim().to_string();
         u.push_str(" 00:00:00");

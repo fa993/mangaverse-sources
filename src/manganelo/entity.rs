@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use isahc::prelude::*;
 use mangaverse_entity::models::{
     chapter::ChapterTable, genre::Genre, manga::MangaTable, page::PageTable, source::SourceTable,
 };
@@ -41,7 +40,7 @@ lazy_static! {
 pub async fn get_manganelo_genres() -> Result<HashSet<String>> {
     let url = "https://manganato.com/genre-all";
 
-    let response_text = isahc::get_async(url).await?.text().await?;
+    let response_text = reqwest::get(url).await?.text().await?;
 
     let doc = Html::parse_document(&response_text);
 
@@ -66,7 +65,7 @@ pub async fn get_manga<'a>(
     mng.url = url;
 
     let doc = Html::parse_document(
-        isahc::get_async(mng.url.as_str())
+        reqwest::get(mng.url.as_str())
             .await?
             .text()
             .await?
@@ -209,7 +208,7 @@ pub async fn get_manga<'a>(
 }
 
 async fn populate_chapter(t: &mut ChapterTable, url_chp: &str) -> Result<()> {
-    t.pages = Html::parse_document(isahc::get_async(url_chp).await?.text().await?.as_str())
+    t.pages = Html::parse_document(reqwest::get(url_chp).await?.text().await?.as_str())
         .select(&IMAGES_SELECTOR)
         .filter_map(|f| f.value().attr("src"))
         .map(ToString::to_string)

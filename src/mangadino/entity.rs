@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use isahc::prelude::*;
 use lazy_static::lazy_static;
 use mangaverse_entity::models::source::SourceTable;
 use scraper::{Html, Selector};
@@ -29,7 +28,7 @@ lazy_static! {
 pub async fn get_mangadino_genres() -> Result<HashSet<String>> {
     let url = "https://mangadino.com/action/";
 
-    let response_text = isahc::get_async(url).await?.text().await?;
+    let response_text = reqwest::get(url).await?.text().await?;
 
     let doc = Html::parse_document(&response_text);
 

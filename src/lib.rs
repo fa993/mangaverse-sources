@@ -23,7 +23,7 @@ pub enum Error {
     SQLError(#[from] sqlx::Error),
 
     #[error(transparent)]
-    NetworkError(#[from] isahc::Error),
+    NetworkError(#[from] reqwest::Error),
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),
