@@ -71,14 +71,7 @@ pub async fn update_manga(
     mng: &mut MangaTable<'_>,
     conn: impl Executor<'_, Database = MySql> + Copy,
 ) -> Result<()> {
-    println!("Watching {}", stored.url);
-
-    if let Some(u) = stored.last_watch_time {
-        if Utc::now().timestamp_millis() - u <= 15 * 60 * 1000 {
-            println!("Not Watching because of time limit");
-            return Ok(());
-        }
-    }
+    println!("Checking {}", stored.url);
 
     let t = stored.name == mng.name
         && stored.cover_url == mng.cover_url
