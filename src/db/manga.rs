@@ -22,16 +22,6 @@ lazy_static! {
     };
 }
 
-pub struct RowWrapper<T> {
-    pub data: T,
-}
-
-impl From<RowWrapper<String>> for String {
-    fn from(rw: RowWrapper<String>) -> Self {
-        rw.data
-    }
-}
-
 pub struct MangaTableWrapper<'a> {
     pub contents: MangaTable<'a>,
     pub source_id: String,
@@ -173,43 +163,38 @@ async fn populate_relations<'a>(
     conn: impl Executor<'_, Database = MySql> + Copy,
     c: &'a Context,
 ) -> Result<()> {
-    pub type RowWrapperString = RowWrapper<String>;
 
-    r.contents.titles = sqlx::query_as!(
-        RowWrapperString,
+    r.contents.titles = sqlx::query!(
         "SELECT title as data from title where linked_id = ?",
         r.contents.linked_id
     )
     .fetch_all(conn)
     .await?
     .into_iter()
-    .map(Into::into)
+    .map(|f| f.data)
     .collect();
 
-    r.contents.authors = sqlx::query_as!(
-        RowWrapperString,
+    r.contents.authors = sqlx::query!(
         "SELECT author.name as data from author, manga_author where manga_author.author_id = author.author_id and manga_author.manga_id = ?",
         r.contents.id
     )
     .fetch_all(conn)
     .await?
     .into_iter()
-    .map(Into::into)
+    .map(|f| f.data)
     .collect();
 
-    r.contents.artists = sqlx::query_as!(
-        RowWrapperString,
+    r.contents.artists = sqlx::query!(
         "SELECT author.name as data from author, manga_artist where manga_artist.author_id = author.author_id and manga_artist.manga_id = ?",
         r.contents.id
     )
     .fetch_all(conn)
     .await?
     .into_iter()
-    .map(Into::into)
+    .map(|f| f.data)
     .collect();
 
-    r.contents.genres = sqlx::query_as!(
-        RowWrapperString,
+    r.contents.genres = sqlx::query!(
         "SELECT genre.name as data from genre, manga_genre where manga_genre.genre_id = genre.genre_id and manga_genre.manga_id = ?",
         r.contents.id
     )
@@ -222,8 +207,7 @@ async fn populate_relations<'a>(
     r.contents.source = c
         .sources
         .get(
-            sqlx::query_as!(
-                RowWrapperString,
+            sqlx::query!(
                 "SELECT source_id as data from source where source_id = ?",
                 r.source_id
             )
@@ -235,6 +219,27 @@ async fn populate_relations<'a>(
         .unwrap();
 
     r.contents.chapters = get_chapters(r.contents.id.as_str(), conn).await?;
+
+    Ok(())
+}
+
+pub async fn insert_manga_if_not_exists(mng: &mut MangaTable<'_>, conn: impl Executor<'_, Database = MySql> + Copy,) -> Result<()> {
+    //WIP
+
+    println!("Checking {}", mng.url);
+
+    let y = sqlx::query!("SELECT count(*) as data from manga where url = ?", mng.url).fetch_one(conn).await?.data;
+
+    if y != 0 {
+        println!("Not Inserting... Manga Already Exists");
+        return Ok(());
+    }
+
+    mng.id = Uuid::new_v4().to_string();
+
+    //look for matches and set priority and linked_id
+
+    add_extra_chaps(&mng.chapters, conn).await?;
 
     Ok(())
 }
