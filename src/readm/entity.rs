@@ -184,6 +184,9 @@ async fn populate_chapter(t: &mut ChapterTable, x: &str) -> Result<()> {
     }
     if let Some(dt) = y.select(&CHAPTER_NUMBER_SELECTOR).next() {
         t.chapter_number = dt.text().collect::<String>();
+        if t.chapter_number.len() > 8 {
+            t.chapter_number = t.chapter_number[8..];
+        }
     }
     for (idxn, f) in y.select(&IMAGES_SELECTOR).enumerate() {
         if let Some(dt) = f.value().attr("src") {
