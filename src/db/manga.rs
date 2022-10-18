@@ -67,14 +67,11 @@ impl FromRow<'_, MySqlRow> for MangaTableWrapper<'_> {
 }
 
 pub async fn update_manga(
-    url: &str,
+    stored: &MangaTable<'_>,
     mng: &mut MangaTable<'_>,
     conn: impl Executor<'_, Database = MySql> + Copy,
-    c: &Context,
 ) -> Result<()> {
-    println!("Watching {}", url);
-
-    let stored = get_manga(url, conn, c).await?;
+    println!("Watching {}", stored.url);
 
     if let Some(u) = stored.last_watch_time {
         if Utc::now().timestamp_millis() - u <= 15 * 60 * 1000 {
@@ -90,7 +87,7 @@ pub async fn update_manga(
         && stored.description == mng.description;
 
     if !t {
-        println!("Updating Metadata for {}", url);
+        println!("Updating Metadata for {}", stored.url);
         // update sql
         sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(conn).await?;
     }
@@ -109,7 +106,7 @@ pub async fn update_manga(
     match stored.chapters.len().cmp(&mng.chapters.len()) {
         Ordering::Less => {
             //add extra
-            println!("Yay! New Chapters added for {}", url);
+            println!("Yay! New Chapters added for {}", stored.url);
             for r in &mut mng.chapters[stored.chapters.len()..] {
                 r.chapter_id = Uuid::new_v4().to_string();
                 r.manga_id = stored.id.clone();
@@ -118,7 +115,7 @@ pub async fn update_manga(
         }
         Ordering::Greater => {
             //delete extra
-            println!("Deleting chapters for {}... strange", url);
+            println!("Deleting chapters for {}... strange", stored.url);
             delete_extra_chaps(
                 stored
                     .chapters
@@ -132,7 +129,7 @@ pub async fn update_manga(
             .await?;
         }
         _ => {
-            println!("No chapter updates for {}", url);
+            println!("No chapter updates for {}", stored.url);
         }
     }
 
