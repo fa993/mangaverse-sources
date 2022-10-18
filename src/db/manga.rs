@@ -137,7 +137,7 @@ pub async fn update_manga(
     Ok(())
 }
 
-pub async fn get_manga<'a>(
+pub async fn get_manga_from_url<'a>(
     url: &'a str,
     conn: impl Executor<'_, Database = MySql> + Copy,
     c: &'a Context,
@@ -147,6 +147,32 @@ pub async fn get_manga<'a>(
         .fetch_one(conn)
         .await?;
 
+    populate_relations(&mut r, conn, c).await?;
+
+    Ok(r.contents)
+}
+
+pub async fn get_manga_from_id<'a>(
+    id: &'a str,
+    conn: impl Executor<'_, Database = MySql> + Copy,
+    c: &'a Context,
+) -> Result<MangaTable<'a>> {
+    let mut r: MangaTableWrapper<'a> = sqlx::query_as("SELECT * from manga where manga_id = ?")
+        .bind(id)
+        .fetch_one(conn)
+        .await?;
+
+    populate_relations(&mut r, conn, c).await?;
+
+    Ok(r.contents)
+}
+
+
+async fn populate_relations<'a>(
+    r: &mut MangaTableWrapper<'a>,
+    conn: impl Executor<'_, Database = MySql> + Copy,
+    c: &'a Context,
+) -> Result<()> {
     pub type RowWrapperString = RowWrapper<String>;
 
     r.contents.titles = sqlx::query_as!(
@@ -210,7 +236,7 @@ pub async fn get_manga<'a>(
 
     r.contents.chapters = get_chapters(r.contents.id.as_str(), conn).await?;
 
-    Ok(r.contents)
+    Ok(())
 }
 
 struct ChapterAndPages {
