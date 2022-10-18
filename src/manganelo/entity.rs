@@ -179,7 +179,7 @@ pub async fn get_manga<'a>(
                 if act_y + 2 < t1_text.len() {
                     t.chapter_name = t1_text[act_y + 2..].trim().to_string();
                 }
-                if act_y < t1_text.len() && act_chp + "Chapter".len() + 1 < t1_text.len() {
+                if act_chp + "Chapter".len() + 1 < act_y && act_y < t1_text.len() {
                     t.chapter_number = t1_text[act_chp + "Chapter".len() + 1..act_y]
                         .trim()
                         .to_string();
