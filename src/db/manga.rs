@@ -9,7 +9,7 @@ use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::types::chrono::{NaiveDateTime, Utc};
-use sqlx::{Executor, FromRow, MySql, Row};
+use sqlx::{Executor, FromRow, MySql, QueryBuilder, Row};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -157,13 +157,11 @@ pub async fn get_manga_from_id<'a>(
     Ok(r.contents)
 }
 
-
 async fn populate_relations<'a>(
     r: &mut MangaTableWrapper<'a>,
     conn: impl Executor<'_, Database = MySql> + Copy,
     c: &'a Context,
 ) -> Result<()> {
-
     r.contents.titles = sqlx::query!(
         "SELECT title as data from title where linked_id = ?",
         r.contents.linked_id
@@ -223,12 +221,18 @@ async fn populate_relations<'a>(
     Ok(())
 }
 
-pub async fn insert_manga_if_not_exists(mng: &mut MangaTable<'_>, conn: impl Executor<'_, Database = MySql> + Copy,) -> Result<()> {
+pub async fn insert_manga_if_not_exists(
+    mng: &mut MangaTable<'_>,
+    conn: impl Executor<'_, Database = MySql> + Copy,
+) -> Result<()> {
     //WIP
 
     println!("Checking {}", mng.url);
 
-    let y = sqlx::query!("SELECT count(*) as data from manga where url = ?", mng.url).fetch_one(conn).await?.data;
+    let y = sqlx::query!("SELECT count(*) as data from manga where url = ?", mng.url)
+        .fetch_one(conn)
+        .await?
+        .data;
 
     if y != 0 {
         println!("Not Inserting... Manga Already Exists");
@@ -236,10 +240,154 @@ pub async fn insert_manga_if_not_exists(mng: &mut MangaTable<'_>, conn: impl Exe
     }
 
     mng.id = Uuid::new_v4().to_string();
+    mng.linked_id = Uuid::new_v4().to_string();
+    mng.last_watch_time = Some(Utc::now().timestamp_millis());
+    let pub_id = Uuid::new_v4().to_string();
 
-    //look for matches and set priority and linked_id
+    //insert metadata
+
+    sqlx::query!("INSERT INTO manga(manga_id, linked_id, is_listed, name, cover_url, url, last_updated, status, is_main, description, source_id, last_watch_time, public_id, is_old) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mng.id, mng.linked_id, true, mng.name, mng.cover_url, mng.url, mng.last_updated, mng.status, false, mng.description, mng.source.id, mng.last_watch_time, pub_id, false).execute(conn).await?;
+
+    //look for matches using the titles table and set priority and linked_id
+
+    let mut q = QueryBuilder::new("SELECT source.priority, manga.linked_id FROM source, manga where manga.source_id = source.source_id AND manga.is_main = 1 AND manga.linked_id = (select linked_id from title where title IN (");
+
+    let mut sep = q.separated(',');
+
+    for t in &mng.titles {
+        sep.push_bind(t);
+    }
+
+    q.push(") limit 1)");
+
+    let pri = q.build().fetch_optional(conn).await?;
+
+    if let Some(p) = pri {
+        let act_pri = p.try_get::<i32, usize>(0)?;
+        let act_link = p.try_get::<String, usize>(1)?;
+
+        match act_pri.cmp(&mng.source.priority) {
+            Ordering::Equal => {
+                //break link... it's actually different
+                sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
+                    .execute(conn)
+                    .await?;
+            }
+            Ordering::Greater => {
+                mng.linked_id = act_link;
+                sqlx::query!(
+                    "UPDATE manga set linked_id = ? where manga_id = ?",
+                    mng.linked_id,
+                    mng.id
+                )
+                .execute(conn)
+                .await?;
+            }
+            Ordering::Less => {
+                mng.linked_id = act_link;
+                sqlx::query!(
+                    "UPDATE manga set linked_id = ? where manga_id = ?",
+                    mng.linked_id,
+                    mng.id
+                )
+                .execute(conn)
+                .await?;
+                sqlx::query!(
+                    "UPDATE manga set is_main = 0 where linked_id = ?",
+                    mng.linked_id
+                )
+                .execute(conn)
+                .await?;
+                sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
+                    .execute(conn)
+                    .await?;
+            }
+        }
+    } else {
+        sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
+            .execute(conn)
+            .await?;
+    }
+
+    //what I'm about to write is horrible... don't do this at least not without a unique constraint
+
+    for t in &mng.titles {
+        sqlx::query!(
+            "INSERT INTO title (title, linked_id, title_id)
+            SELECT * FROM (SELECT ? as title, ? as linked_id , ? as title_id) AS tmp
+            WHERE NOT EXISTS (
+                SELECT title FROM title WHERE title = ?
+            ) LIMIT 1",
+            t.as_str(),
+            mng.linked_id,
+            Uuid::new_v4().to_string(),
+            t.as_str()
+        )
+        .execute(conn)
+        .await?;
+    }
+
+    //insert all the relations
+
+    //genres
+
+    let mut q = QueryBuilder::new("INSERT into manga_genre(genre_id, manga_id) ");
+
+    q.push_values(mng.genres.as_slice(), |mut b, gen| {
+        b.push_bind(gen.id.as_str());
+        b.push_bind(mng.id.as_str());
+    });
+
+    q.build().execute(conn).await?;
+
+    //first insert into authors table to check if author exists... then do an insert into select statement
+
+    let mut q = QueryBuilder::new("INSERT into author(author_id, name) ");
+
+    q.push_values(mng.authors.as_slice(), |mut b, author| {
+        b.push_bind(Uuid::new_v4().to_string());
+        b.push_bind(author);
+    });
+
+    q.push(" ON DUPLICATE KEY update author_id = author_id");
+
+    //authors
+
+    q = QueryBuilder::new("INSERT into manga_author(author_id, manga_id) select ");
+    q.push_bind(mng.id.as_str());
+    q.push(" as manga_id, author.author_id from author where author.name IN (");
+
+    let mut sep = q.separated(',');
+
+    for t in &mng.authors {
+        sep.push_bind(t);
+    }
+
+    q.push(')');
+
+    q.build().execute(conn).await?;
+
+    //artists
+
+    q = QueryBuilder::new("INSERT into manga_artist(author_id, manga_id) select ");
+    q.push_bind(mng.id.as_str());
+    q.push(" as manga_id, author.author_id from author where author.name IN (");
+
+    let mut sep = q.separated(',');
+
+    for t in &mng.authors {
+        sep.push_bind(t);
+    }
+
+    q.push(')');
+
+    q.build().execute(conn).await?;
+
+    //chapters
 
     add_extra_chaps(&mng.chapters, conn).await?;
+
+    println!("Finished inserting {}", mng.url);
 
     Ok(())
 }
