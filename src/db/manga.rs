@@ -370,7 +370,7 @@ pub async fn insert_manga(
 
     let mut sep = q.separated(',');
 
-    for t in &mng.authors {
+    for t in &mng.artists {
         sep.push_bind(t);
     }
 
