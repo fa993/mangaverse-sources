@@ -314,12 +314,13 @@ pub async fn insert_manga(
             "INSERT INTO title (title, linked_id, title_id)
             SELECT * FROM (SELECT ? as title, ? as linked_id , ? as title_id) AS tmp
             WHERE NOT EXISTS (
-                SELECT title FROM title WHERE title = ?
+                SELECT title FROM title WHERE title = ? AND linked_id = ?
             ) LIMIT 1",
             t.as_str(),
-            mng.linked_id,
+            mng.linked_id.as_str(),
             Uuid::new_v4().to_string(),
-            t.as_str()
+            t.as_str(),
+            mng.linked_id.as_str()
         )
         .execute(&mut *conn)
         .await?;
