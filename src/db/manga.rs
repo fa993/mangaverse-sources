@@ -8,8 +8,9 @@ use mangaverse_entity::models::manga::MangaTable;
 use mangaverse_entity::models::page::PageTable;
 use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
+use sqlx::pool::PoolConnection;
 use sqlx::types::chrono::{NaiveDateTime, Utc};
-use sqlx::{Executor, FromRow, MySql, QueryBuilder, Row};
+use sqlx::{FromRow, MySql, QueryBuilder, Row};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -59,7 +60,7 @@ impl FromRow<'_, MySqlRow> for MangaTableWrapper<'_> {
 pub async fn update_manga(
     stored: &MangaTable<'_>,
     mng: &mut MangaTable<'_>,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>,
 ) -> Result<()> {
     println!("Checking {}", stored.url);
 
@@ -72,7 +73,7 @@ pub async fn update_manga(
     if !t {
         println!("Updating Metadata for {}", stored.url);
         // update sql
-        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(conn).await?;
+        sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(&mut *conn).await?;
     }
 
     //handle collection updates probably by a generic function
@@ -121,7 +122,7 @@ pub async fn update_manga(
         Utc::now().timestamp_millis(),
         stored.id
     )
-    .execute(conn)
+    .execute(&mut *conn)
     .await?;
 
     Ok(())
@@ -129,12 +130,12 @@ pub async fn update_manga(
 
 pub async fn get_manga_from_url<'a>(
     url: &'a str,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>,
     c: &'a Context,
 ) -> Result<MangaTable<'a>> {
     let mut r: MangaTableWrapper<'a> = sqlx::query_as("SELECT * from manga where url = ?")
         .bind(url)
-        .fetch_one(conn)
+        .fetch_one(&mut *conn)
         .await?;
 
     populate_relations(&mut r, conn, c).await?;
@@ -144,12 +145,12 @@ pub async fn get_manga_from_url<'a>(
 
 pub async fn get_manga_from_id<'a>(
     id: &'a str,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>,
     c: &'a Context,
 ) -> Result<MangaTable<'a>> {
     let mut r: MangaTableWrapper<'a> = sqlx::query_as("SELECT * from manga where manga_id = ?")
         .bind(id)
-        .fetch_one(conn)
+        .fetch_one(&mut *conn)
         .await?;
 
     populate_relations(&mut r, conn, c).await?;
@@ -159,14 +160,14 @@ pub async fn get_manga_from_id<'a>(
 
 async fn populate_relations<'a>(
     r: &mut MangaTableWrapper<'a>,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>,
     c: &'a Context,
 ) -> Result<()> {
     r.contents.titles = sqlx::query!(
         "SELECT title as data from title where linked_id = ?",
         r.contents.linked_id
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .map(|f| f.data)
@@ -176,7 +177,7 @@ async fn populate_relations<'a>(
         "SELECT author.name as data from author, manga_author where manga_author.author_id = author.author_id and manga_author.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .map(|f| f.data)
@@ -186,7 +187,7 @@ async fn populate_relations<'a>(
         "SELECT author.name as data from author, manga_artist where manga_artist.author_id = author.author_id and manga_artist.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .map(|f| f.data)
@@ -196,7 +197,7 @@ async fn populate_relations<'a>(
         "SELECT genre.name as data from genre, manga_genre where manga_genre.genre_id = genre.genre_id and manga_genre.manga_id = ?",
         r.contents.id
     )
-    .fetch_all(conn)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .filter_map(|f| c.genres.get(f.data.as_str()))
@@ -209,7 +210,7 @@ async fn populate_relations<'a>(
                 "SELECT source_id as data from source where source_id = ?",
                 r.source_id
             )
-            .fetch_one(conn)
+            .fetch_one(&mut *conn)
             .await?
             .data
             .as_str(),
@@ -223,14 +224,14 @@ async fn populate_relations<'a>(
 
 pub async fn insert_manga_if_not_exists(
     mng: &mut MangaTable<'_>,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>
 ) -> Result<()> {
     //WIP
 
     println!("Checking {}", mng.url);
 
     let y = sqlx::query!("SELECT count(*) as data from manga where url = ?", mng.url)
-        .fetch_one(conn)
+        .fetch_one(&mut *conn)
         .await?
         .data;
 
@@ -246,7 +247,7 @@ pub async fn insert_manga_if_not_exists(
 
     //insert metadata
 
-    sqlx::query!("INSERT INTO manga(manga_id, linked_id, is_listed, name, cover_url, url, last_updated, status, is_main, description, source_id, last_watch_time, public_id, is_old) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mng.id, mng.linked_id, true, mng.name, mng.cover_url, mng.url, mng.last_updated, mng.status, false, mng.description, mng.source.id, mng.last_watch_time, pub_id, false).execute(conn).await?;
+    sqlx::query!("INSERT INTO manga(manga_id, linked_id, is_listed, name, cover_url, url, last_updated, status, is_main, description, source_id, last_watch_time, public_id, is_old) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mng.id, mng.linked_id, true, mng.name, mng.cover_url, mng.url, mng.last_updated, mng.status, false, mng.description, mng.source.id, mng.last_watch_time, pub_id, false).execute(&mut *conn).await?;
 
     //look for matches using the titles table and set priority and linked_id
 
@@ -260,7 +261,7 @@ pub async fn insert_manga_if_not_exists(
 
     q.push(") limit 1)");
 
-    let pri = q.build().fetch_optional(conn).await?;
+    let pri = q.build().fetch_optional(&mut *conn).await?;
 
     if let Some(p) = pri {
         let act_pri = p.try_get::<i32, usize>(0)?;
@@ -270,7 +271,7 @@ pub async fn insert_manga_if_not_exists(
             Ordering::Equal => {
                 //break link... it's actually different
                 sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
-                    .execute(conn)
+                    .execute(&mut *conn)
                     .await?;
             }
             Ordering::Greater => {
@@ -280,7 +281,7 @@ pub async fn insert_manga_if_not_exists(
                     mng.linked_id,
                     mng.id
                 )
-                .execute(conn)
+                .execute(&mut *conn)
                 .await?;
             }
             Ordering::Less => {
@@ -290,22 +291,22 @@ pub async fn insert_manga_if_not_exists(
                     mng.linked_id,
                     mng.id
                 )
-                .execute(conn)
+                .execute(&mut *conn)
                 .await?;
                 sqlx::query!(
                     "UPDATE manga set is_main = 0 where linked_id = ?",
                     mng.linked_id
                 )
-                .execute(conn)
+                .execute(&mut *conn)
                 .await?;
                 sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
-                    .execute(conn)
+                    .execute(&mut *conn)
                     .await?;
             }
         }
     } else {
         sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
-            .execute(conn)
+            .execute(&mut *conn)
             .await?;
     }
 
@@ -323,7 +324,7 @@ pub async fn insert_manga_if_not_exists(
             Uuid::new_v4().to_string(),
             t.as_str()
         )
-        .execute(conn)
+        .execute(&mut *conn)
         .await?;
     }
 
@@ -338,7 +339,7 @@ pub async fn insert_manga_if_not_exists(
         b.push_bind(mng.id.as_str());
     });
 
-    q.build().execute(conn).await?;
+    q.build().execute(&mut *conn).await?;
 
     //first insert into authors table to check if author exists... then do an insert into select statement
 
@@ -350,6 +351,8 @@ pub async fn insert_manga_if_not_exists(
     });
 
     q.push(" ON DUPLICATE KEY update author_id = author_id");
+
+    q.build().execute(&mut *conn).await?;
 
     //authors
 
@@ -365,7 +368,7 @@ pub async fn insert_manga_if_not_exists(
 
     q.push(')');
 
-    q.build().execute(conn).await?;
+    q.build().execute(&mut *conn).await?;
 
     //artists
 
@@ -381,7 +384,7 @@ pub async fn insert_manga_if_not_exists(
 
     q.push(')');
 
-    q.build().execute(conn).await?;
+    q.build().execute(&mut *conn).await?;
 
     //chapters
 
@@ -406,7 +409,7 @@ struct ChapterAndPages {
 
 pub async fn get_chapters(
     id: &str,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>,
 ) -> Result<Vec<ChapterTable>> {
     //do a hack
     //use group concat to eliminate multiple sql calls and speed shit up

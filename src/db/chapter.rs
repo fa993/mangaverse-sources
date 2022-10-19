@@ -1,12 +1,12 @@
 use mangaverse_entity::models::chapter::ChapterTable;
-use sqlx::{Executor, MySql, QueryBuilder};
+use sqlx::{MySql, QueryBuilder, pool::PoolConnection};
 
 use crate::Result;
 
 pub async fn update_chapter(
     ori: &ChapterTable,
     lat: &ChapterTable,
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>
 ) -> Result<()> {
     let chk_met = ori.chapter_name == lat.chapter_name
         && ori.chapter_number == lat.chapter_number
@@ -19,7 +19,7 @@ pub async fn update_chapter(
         .all(|e| e.0.url == e.1.url);
 
     if !chk_met {
-        sqlx::query!("UPDATE chapter SET chapter_name = ?, chapter_number = ?, updated_at = ? where chapter_id = ?", lat.chapter_name, lat.chapter_number, lat.updated_at, ori.chapter_id).execute(conn).await?;
+        sqlx::query!("UPDATE chapter SET chapter_name = ?, chapter_number = ?, updated_at = ? where chapter_id = ?", lat.chapter_name, lat.chapter_number, lat.updated_at, ori.chapter_id).execute(&mut *conn).await?;
     }
 
     if !chk_pg {
@@ -28,7 +28,7 @@ pub async fn update_chapter(
             "DELETE FROM chapter_page where chapter_id = ?",
             ori.chapter_id
         )
-        .execute(conn)
+        .execute(&mut *conn)
         .await?;
 
         //add new
@@ -40,7 +40,7 @@ pub async fn update_chapter(
             b.push_bind(ori.chapter_id.as_str());
         });
 
-        q.build().execute(conn).await?;
+        q.build().execute(&mut *conn).await?;
     }
 
     Ok(())
@@ -48,14 +48,14 @@ pub async fn update_chapter(
 
 pub async fn delete_extra_chaps(
     chp_ids: &[&str],
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>
 ) -> Result<()> {
     for t in chp_ids {
         sqlx::query!("DELETE FROM chapter_page where chapter_id = ?", t)
-            .execute(conn)
+            .execute(&mut *conn)
             .await?;
         sqlx::query!("DELETE FROM chapter where chapter_id = ?", t)
-            .execute(conn)
+            .execute(&mut *conn)
             .await?;
     }
     Ok(())
@@ -63,10 +63,10 @@ pub async fn delete_extra_chaps(
 
 pub async fn add_extra_chaps(
     chps: &[ChapterTable],
-    conn: impl Executor<'_, Database = MySql> + Copy,
+    conn: &mut PoolConnection<MySql>
 ) -> Result<()> {
     for lat in chps {
-        sqlx::query!("INSERT INTO chapter(chapter_name, chapter_number, updated_at, chapter_id, manga_id, sequence_number, last_watch_time) VALUES(?, ?, ?, ?, ?, ?, ?)", lat.chapter_name, lat.chapter_number, lat.updated_at, lat.chapter_id, lat.manga_id, lat.sequence_number, lat.last_watch_time).execute(conn).await?;
+        sqlx::query!("INSERT INTO chapter(chapter_name, chapter_number, updated_at, chapter_id, manga_id, sequence_number, last_watch_time) VALUES(?, ?, ?, ?, ?, ?, ?)", lat.chapter_name, lat.chapter_number, lat.updated_at, lat.chapter_id, lat.manga_id, lat.sequence_number, lat.last_watch_time).execute(&mut *conn).await?;
 
         let mut q = QueryBuilder::new("INSERT into chapter_page(url, page_number, chapter_id) ");
 
@@ -76,7 +76,7 @@ pub async fn add_extra_chaps(
             b.push_bind(lat.chapter_id.as_str());
         });
 
-        q.build().execute(conn).await?;
+        q.build().execute(&mut *conn).await?;
     }
 
     Ok(())
