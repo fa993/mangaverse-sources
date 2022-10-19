@@ -358,7 +358,7 @@ pub async fn insert_manga_if_not_exists(
 
     //authors
 
-    q = QueryBuilder::new("INSERT into manga_author(author_id, manga_id) select ");
+    q = QueryBuilder::new("INSERT into manga_author(manga_id, author_id) select ");
     q.push_bind(mng.id.as_str());
     q.push(" as manga_id, author.author_id from author where author.name IN (");
 
