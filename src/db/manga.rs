@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::{Context, Result};
+use inflector::Inflector;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use mangaverse_entity::models::chapter::ChapterTable;
@@ -224,7 +225,7 @@ async fn populate_relations<'a>(
 
 pub async fn insert_manga(
     mng: &mut MangaTable<'_>,
-    conn: &mut PoolConnection<MySql>
+    conn: &mut PoolConnection<MySql>,
 ) -> Result<()> {
     //WIP
 
@@ -233,13 +234,13 @@ pub async fn insert_manga(
     mng.id = Uuid::new_v4().to_string();
     mng.linked_id = Uuid::new_v4().to_string();
     mng.last_watch_time = Some(Utc::now().timestamp_millis());
-    let pub_id = Uuid::new_v4().to_string();
+    mng.public_id = Uuid::new_v4().to_string();
     mng.artists = mng.artists.iter().map(|f| f.to_lowercase()).collect();
     mng.authors = mng.authors.iter().map(|f| f.to_uppercase()).collect();
 
     //insert metadata
 
-    sqlx::query!("INSERT INTO manga(manga_id, linked_id, is_listed, name, cover_url, url, last_updated, status, is_main, description, source_id, last_watch_time, public_id, is_old) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mng.id, mng.linked_id, true, mng.name, mng.cover_url, mng.url, mng.last_updated, mng.status, false, mng.description, mng.source.id, mng.last_watch_time, pub_id, false).execute(&mut *conn).await?;
+    sqlx::query!("INSERT INTO manga(manga_id, linked_id, is_listed, name, cover_url, url, last_updated, status, is_main, description, source_id, last_watch_time, public_id, is_old) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", mng.id, mng.linked_id, true, mng.name, mng.cover_url, mng.url, mng.last_updated, mng.status, false, mng.description, mng.source.id, mng.last_watch_time, mng.public_id, false).execute(&mut *conn).await?;
 
     //look for matches using the titles table and set priority and linked_id
 
@@ -387,6 +388,15 @@ pub async fn insert_manga(
 
     add_extra_chaps(&mng.chapters, conn).await?;
 
+    let genres_all = itertools::Itertools::intersperse(
+        mng.genres.iter().map(|f| f.name.to_title_case()),
+        ", ".to_string(),
+    )
+    .collect::<String>();
+    let description_small = &mng.description[..255.min(mng.description.len())];
+
+    sqlx::query!("INSERT into manga_listing(manga_id, cover_url, name, genres, description_small, public_id) VALUES(?, ?, ?, ?, ?, ?)", mng.id, mng.cover_url, mng.name, genres_all, description_small, mng.public_id).execute(&mut *conn).await?;
+
     println!("Finished inserting {}", mng.url);
 
     Ok(())
@@ -404,10 +414,7 @@ struct ChapterAndPages {
     pub all_pages: Option<String>,
 }
 
-pub async fn get_chapters(
-    id: &str,
-    conn: &mut PoolConnection<MySql>,
-) -> Result<Vec<ChapterTable>> {
+pub async fn get_chapters(id: &str, conn: &mut PoolConnection<MySql>) -> Result<Vec<ChapterTable>> {
     //do a hack
     //use group concat to eliminate multiple sql calls and speed shit up
     //use space as separator
