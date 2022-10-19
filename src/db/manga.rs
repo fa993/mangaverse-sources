@@ -342,52 +342,64 @@ pub async fn insert_manga(
 
     //first insert into authors table to check if author exists... then do an insert into select statement
 
-    let mut q = QueryBuilder::new("INSERT into author(author_id, name) ");
+    if !mng.artists.is_empty() || !mng.authors.is_empty() {
 
-    q.push_values(mng.authors.as_slice(), |mut b, author| {
-        b.push_bind(Uuid::new_v4().to_string());
-        b.push_bind(author);
-    });
+        let mut q = QueryBuilder::new("INSERT into author(author_id, name) ");
+
+        q.push_values(mng.artists.iter().chain(mng.authors.iter()), |mut b, author| {
+            b.push_bind(Uuid::new_v4().to_string());
+            b.push_bind(author);
+        });
 
     q.push(" ON DUPLICATE KEY update author_id = author_id");
 
     q.build().execute(&mut *conn).await?;
 
+    }
+
     println!("After author insert");
 
     //authors
 
-    q = QueryBuilder::new("INSERT into manga_author(manga_id, author_id) select ");
-    q.push_bind(mng.id.as_str());
-    q.push(" as manga_id, author.author_id from author where author.name IN (");
+    if !mng.authors.is_empty() {
 
-    let mut sep = q.separated(',');
+        q = QueryBuilder::new("INSERT into manga_author(manga_id, author_id) select ");
+        q.push_bind(mng.id.as_str());
+        q.push(" as manga_id, author.author_id as author_id from author where author.name IN (");
 
-    for t in &mng.authors {
-        sep.push_bind(t);
+        let mut sep = q.separated(',');
+
+        for t in &mng.authors {
+            sep.push_bind(t);
+        }
+
+        q.push(')');
+
+        q.build().execute(&mut *conn).await?;
+
     }
-
-    q.push(')');
-
-    q.build().execute(&mut *conn).await?;
 
     println!("After manga_author insert");
 
     //artists
 
-    q = QueryBuilder::new("INSERT into manga_artist(manga_id, author_id) select ");
-    q.push_bind(mng.id.as_str());
-    q.push(" as manga_id, author.author_id from author where author.name IN (");
+    if !mng.artists.is_empty() {
 
-    let mut sep = q.separated(',');
+        q = QueryBuilder::new("INSERT into manga_artist(manga_id, author_id) select ");
+        q.push_bind(mng.id.as_str());
+        q.push(" as manga_id, author.author_id as author_id from author where author.name IN (");
 
-    for t in &mng.artists {
-        sep.push_bind(t);
+        let mut sep = q.separated(',');
+
+        for t in &mng.artists {
+            sep.push_bind(t);
+        }
+
+        q.push(')');
+
+        q.build().execute(&mut *conn).await?;
+        
     }
-
-    q.push(')');
-
-    q.build().execute(&mut *conn).await?;
 
     println!("After manga_artist insert");
 
