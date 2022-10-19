@@ -244,6 +244,8 @@ pub async fn insert_manga_if_not_exists(
     mng.linked_id = Uuid::new_v4().to_string();
     mng.last_watch_time = Some(Utc::now().timestamp_millis());
     let pub_id = Uuid::new_v4().to_string();
+    mng.artists = mng.artists.iter().map(|f| f.to_lowercase()).collect();
+    mng.authors = mng.authors.iter().map(|f| f.to_uppercase()).collect();
 
     //insert metadata
 
