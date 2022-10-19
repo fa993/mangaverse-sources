@@ -256,6 +256,8 @@ pub async fn insert_manga(
 
     let pri = q.build().fetch_optional(&mut *conn).await?;
 
+    println!("After priorty fetch");
+
     if let Some(p) = pri {
         let act_pri = p.try_get::<i32, usize>(0)?;
         let act_link = p.try_get::<String, usize>(1)?;
@@ -303,6 +305,8 @@ pub async fn insert_manga(
             .await?;
     }
 
+    println!("After is main update");
+
     //what I'm about to write is horrible... don't do this at least not without a unique constraint
 
     for t in &mng.titles {
@@ -320,6 +324,8 @@ pub async fn insert_manga(
         .execute(&mut *conn)
         .await?;
     }
+
+    println!("After title insert");
 
     //insert all the relations
 
@@ -347,6 +353,8 @@ pub async fn insert_manga(
 
     q.build().execute(&mut *conn).await?;
 
+    println!("After author insert");
+
     //authors
 
     q = QueryBuilder::new("INSERT into manga_author(manga_id, author_id) select ");
@@ -362,6 +370,8 @@ pub async fn insert_manga(
     q.push(')');
 
     q.build().execute(&mut *conn).await?;
+
+    println!("After manga_author insert");
 
     //artists
 
@@ -379,6 +389,8 @@ pub async fn insert_manga(
 
     q.build().execute(&mut *conn).await?;
 
+    println!("After manga_artist insert");
+
     //chapters
 
     for r in &mut mng.chapters {
@@ -388,6 +400,8 @@ pub async fn insert_manga(
 
     add_extra_chaps(&mng.chapters, conn).await?;
 
+    println!("After chapters insert");
+
     let genres_all = itertools::Itertools::intersperse(
         mng.genres.iter().map(|f| f.name.to_title_case()),
         ", ".to_string(),
@@ -396,6 +410,8 @@ pub async fn insert_manga(
     let description_small = &mng.description[..255.min(mng.description.len())];
 
     sqlx::query!("INSERT into manga_listing(manga_id, cover_url, name, genres, description_small, public_id) VALUES(?, ?, ?, ?, ?, ?)", mng.id, mng.cover_url, mng.name, genres_all, description_small, mng.public_id).execute(&mut *conn).await?;
+
+    println!("After listing insert");
 
     println!("Finished inserting {}", mng.url);
 
