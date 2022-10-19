@@ -222,23 +222,13 @@ async fn populate_relations<'a>(
     Ok(())
 }
 
-pub async fn insert_manga_if_not_exists(
+pub async fn insert_manga(
     mng: &mut MangaTable<'_>,
     conn: &mut PoolConnection<MySql>
 ) -> Result<()> {
     //WIP
 
-    println!("Checking {}", mng.url);
-
-    let y = sqlx::query!("SELECT count(*) as data from manga where url = ?", mng.url)
-        .fetch_one(&mut *conn)
-        .await?
-        .data;
-
-    if y != 0 {
-        println!("Not Inserting... Manga Already Exists");
-        return Ok(());
-    }
+    println!("Adding {}", mng.url);
 
     mng.id = Uuid::new_v4().to_string();
     mng.linked_id = Uuid::new_v4().to_string();
@@ -389,6 +379,11 @@ pub async fn insert_manga_if_not_exists(
     q.build().execute(&mut *conn).await?;
 
     //chapters
+
+    for r in &mut mng.chapters {
+        r.chapter_id = Uuid::new_v4().to_string();
+        r.manga_id = mng.id.clone();
+    }
 
     add_extra_chaps(&mng.chapters, conn).await?;
 
