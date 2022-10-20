@@ -91,11 +91,12 @@ pub async fn update_manga(
         let description_small = &mng.description[..255.min(mng.description.len())];
 
         sqlx::query!(
-            "UPDATE manga_listing SET cover_url = ? , name = ?, genres = ?, description_small = ?",
+            "UPDATE manga_listing SET cover_url = ? , name = ?, genres = ?, description_small = ? where manga_id = ?",
             mng.cover_url,
             mng.name,
             genres_all,
-            description_small
+            description_small,
+            stored.id
         )
         .execute(&mut *conn)
         .await?;
