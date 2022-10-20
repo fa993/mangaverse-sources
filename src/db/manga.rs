@@ -65,11 +65,13 @@ pub async fn update_manga(
 ) -> Result<()> {
     println!("Checking {}", stored.url);
 
-    let t = stored.name == mng.name
+    let t1 = stored.name == mng.name
         && stored.cover_url == mng.cover_url
-        && stored.last_updated == mng.last_updated
-        && stored.status == mng.status
         && stored.description == mng.description;
+
+    let t = t1 && stored.last_updated == mng.last_updated && stored.status == mng.status;
+
+    let f = stored.genres == mng.genres;
 
     if !t {
         println!("Updating Metadata for {}", stored.url);
@@ -77,7 +79,44 @@ pub async fn update_manga(
         sqlx::query!("UPDATE manga SET name = ?, cover_url = ?, last_updated = ?, status = ?, description = ? where manga_id = ?", mng.name, mng.cover_url, mng.last_updated, mng.status, mng.description, stored.id).execute(&mut *conn).await?;
     }
 
+    if !f || !t1 {
+
+        println!("Updating Manga Listing for {}", stored.url);
+
+        let genres_all = itertools::Itertools::intersperse(
+            mng.genres.iter().map(|f| f.name.to_title_case()),
+            ", ".to_string(),
+        )
+        .collect::<String>();
+        let description_small = &mng.description[..255.min(mng.description.len())];
+
+        sqlx::query!(
+            "UPDATE manga_listing SET cover_url = ? , name = ?, genres = ?, description_small = ?",
+            mng.cover_url,
+            mng.name,
+            genres_all,
+            description_small
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+
     //handle collection updates probably by a generic function
+
+    if !f {
+        sqlx::query!("DELETE from manga_genre where manga_id = ?", stored.id).execute(&mut *conn).await?;
+
+        let mut q = QueryBuilder::new("INSERT into manga_genre(manga_id, genre_id) ");
+
+        q.push_values(mng.genres.as_slice(), |mut b, genre| {
+            b.push_bind(stored.id.as_str());
+            b.push_bind(genre.id.as_str());
+        });
+
+        q.build().execute(&mut *conn).await?;
+
+        println!("Inserted updated genres into manga");
+    }
 
     let fut = stored.chapters.iter().zip(mng.chapters.iter());
 
@@ -344,18 +383,19 @@ pub async fn insert_manga(
     //first insert into authors table to check if author exists... then do an insert into select statement
 
     if !mng.artists.is_empty() || !mng.authors.is_empty() {
-
         let mut q = QueryBuilder::new("INSERT into author(author_id, name) ");
 
-        q.push_values(mng.artists.iter().chain(mng.authors.iter()), |mut b, author| {
-            b.push_bind(Uuid::new_v4().to_string());
-            b.push_bind(author);
-        });
+        q.push_values(
+            mng.artists.iter().chain(mng.authors.iter()),
+            |mut b, author| {
+                b.push_bind(Uuid::new_v4().to_string());
+                b.push_bind(author);
+            },
+        );
 
-    q.push(" ON DUPLICATE KEY update author_id = author_id");
+        q.push(" ON DUPLICATE KEY update author_id = author_id");
 
-    q.build().execute(&mut *conn).await?;
-
+        q.build().execute(&mut *conn).await?;
     }
 
     println!("After author insert");
@@ -363,7 +403,6 @@ pub async fn insert_manga(
     //authors
 
     if !mng.authors.is_empty() {
-
         q = QueryBuilder::new("INSERT into manga_author(manga_id, author_id) select ");
         q.push_bind(mng.id.as_str());
         q.push(" as manga_id, author.author_id as author_id from author where author.name IN (");
@@ -377,7 +416,6 @@ pub async fn insert_manga(
         q.push(')');
 
         q.build().execute(&mut *conn).await?;
-
     }
 
     println!("After manga_author insert");
@@ -385,7 +423,6 @@ pub async fn insert_manga(
     //artists
 
     if !mng.artists.is_empty() {
-
         q = QueryBuilder::new("INSERT into manga_artist(manga_id, author_id) select ");
         q.push_bind(mng.id.as_str());
         q.push(" as manga_id, author.author_id as author_id from author where author.name IN (");
@@ -399,7 +436,6 @@ pub async fn insert_manga(
         q.push(')');
 
         q.build().execute(&mut *conn).await?;
-        
     }
 
     println!("After manga_artist insert");
