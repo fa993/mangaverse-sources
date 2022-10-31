@@ -154,7 +154,7 @@ pub async fn update_manga(
             )
             .await?;
         }
-        _ => {
+        Ordering::Equal => {
             println!("No chapter updates for {}", stored.url);
         }
     }
@@ -303,7 +303,7 @@ pub async fn insert_manga(
         let act_pri = p.try_get::<i32, usize>(0)?;
         let act_link = p.try_get::<String, usize>(1)?;
 
-        match act_pri.cmp(&mng.source.priority) {
+        match mng.source.priority.cmp(&act_pri) {
             Ordering::Equal => {
                 //break link... it's actually different
                 sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
