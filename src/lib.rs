@@ -8,6 +8,7 @@ pub mod db;
 pub mod mangadino;
 pub mod manganelo;
 pub mod readm;
+pub mod studygroup;
 
 pub type Result<T> = std::result::Result<T, MSError>;
 

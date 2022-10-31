@@ -80,7 +80,6 @@ pub async fn update_manga(
     }
 
     if !f || !t1 {
-
         println!("Updating Manga Listing for {}", stored.url);
 
         let genres_all = itertools::Itertools::intersperse(
@@ -105,7 +104,9 @@ pub async fn update_manga(
     //handle collection updates probably by a generic function
 
     if !f {
-        sqlx::query!("DELETE from manga_genre where manga_id = ?", stored.id).execute(&mut *conn).await?;
+        sqlx::query!("DELETE from manga_genre where manga_id = ?", stored.id)
+            .execute(&mut *conn)
+            .await?;
 
         let mut q = QueryBuilder::new("INSERT into manga_genre(manga_id, genre_id) ");
 
