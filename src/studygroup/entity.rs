@@ -101,7 +101,7 @@ pub async fn get_manga<'a>(
         let metadata_table = iter_label.zip(iter_value);
 
         for (label, value) in metadata_table {
-            println!("{}", value.text().collect::<String>());
+            println!("{:#?}", value.text().collect::<String>().split('-').map(str::trim).map(str::to_lowercase).collect::<Vec<_>>());
             match label.text().collect::<String>().as_str() {
                 AUTHOR => mng.authors.extend(
                     value
