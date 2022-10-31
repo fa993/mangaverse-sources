@@ -175,6 +175,8 @@ pub async fn get_manga<'a>(
         }
     }
 
+    println!("{:#?}", mng);
+
     Ok(mng)
 }
 
