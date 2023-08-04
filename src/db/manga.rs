@@ -11,7 +11,7 @@ use mangaverse_entity::models::source::SourceTable;
 use sqlx::mysql::MySqlRow;
 use sqlx::pool::PoolConnection;
 use sqlx::types::chrono::{NaiveDateTime, Utc};
-use sqlx::{FromRow, MySql, QueryBuilder, Row};
+use sqlx::{FromRow, MySql, QueryBuilder, Row, Acquire};
 use uuid::Uuid;
 
 use super::chapter::{add_extra_chaps, delete_extra_chaps, update_chapter};
@@ -322,22 +322,26 @@ pub async fn insert_manga(
             }
             Ordering::Less => {
                 mng.linked_id = act_link;
+                let mut txt = conn.begin().await?;
+                
                 sqlx::query!(
                     "UPDATE manga set linked_id = ? where manga_id = ?",
                     mng.linked_id,
                     mng.id
                 )
-                .execute(&mut *conn)
+                .execute(&mut txt)
                 .await?;
                 sqlx::query!(
                     "UPDATE manga set is_main = 0 where linked_id = ?",
                     mng.linked_id
                 )
-                .execute(&mut *conn)
+                .execute(&mut txt)
                 .await?;
                 sqlx::query!("UPDATE manga set is_main = 1 where manga_id = ?", mng.id)
-                    .execute(&mut *conn)
+                    .execute(&mut txt)
                     .await?;
+
+                txt.commit().await?;
             }
         }
     } else {
